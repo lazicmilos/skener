@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from typing import Literal
 from xml.etree import ElementTree
 
-from skener.fetch.urls import normalize, path_group
+from skener.fetch.urls import normalize, path_group, same_site
 
 SitemapKind = Literal["index", "urlset", "unknown"]
 
@@ -80,7 +80,8 @@ def sample(home_url: str, urls: Iterable[str], sample_size: int) -> list[str]:
     groups: dict[str, set[str]] = defaultdict(set)
     for url in urls:
         canonical = normalize(url)
-        if canonical and canonical != home:
+        # Sitemap je tuđ sadržaj: strani host iz njega ne troši budžet ovog domena.
+        if canonical and canonical != home and same_site(canonical, home_url):
             groups[path_group(canonical)].add(canonical)
 
     # Grupe: po veličini opadajuće, pa po imenu — da izjednačenje ne zavisi od

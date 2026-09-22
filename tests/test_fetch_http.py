@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import socket
+from dataclasses import replace
 
 import httpx
 import pytest
@@ -360,3 +361,105 @@ def test_snapshot_se_pise_na_disk_cim_je_domen_gotov(tmp_path):
 def test_ime_direktorijuma_ne_izlazi_iz_izlaznog_foldera(domain, expected):
     """Domen dolazi iz korisnikovog CSV-a — granica poverenja."""
     assert store.slug(domain) == expected
+
+
+# --------------------------------------------------------------------------- #
+# Regresije iz revizije pred pravi prolaz — svaka je tiha na localhost-u, a
+# glasna na 200 pravih domena.
+# --------------------------------------------------------------------------- #
+class SporSajt(FakeSite):
+    """Svaki odgovor kasni — lokalni server inače odgovara za mikrosekunde."""
+
+    def __init__(self, *, delay: float, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.delay = delay
+
+    def route(self, path: str) -> Response:
+        return replace(super().route(path), delay=self.delay)
+
+
+def test_budzet_vremena_krece_tek_kad_domen_dobije_red():
+    """Budžet od 25 s je za rad na domenu, ne za čekanje u redu iza ostalih 199.
+
+    Sa globalnim semaforom od 2 i deset domena, ukupan rad traje ~2× duže od
+    budžeta. Ako sat krene za sve odjednom, poslednji domeni ispadnu `partial`
+    a da nijedan zahtev nije bio spor.
+    """
+    sajtovi = [SporSajt(delay=0.04) for _ in range(10)]
+    for sajt in sajtovi:
+        sajt.__enter__()
+    try:
+        cfg = load_config()
+        cfg["http"].update(delay_ms=[0, 0], concurrency=2, domain_concurrency=2, max_seconds_per_domain=2)
+        targets = [DomainInput(domain=s.base_url) for s in sajtovi]
+        snapshots = asyncio.run(scan_domains(targets, cfg))
+    finally:
+        for sajt in sajtovi:
+            sajt.__exit__()
+
+    potroseni = [s.domain for s in snapshots if s.budget.exhausted]
+    assert not potroseni, f"budžet potrošen na čekanje u redu: {potroseni}"
+
+
+def test_vreme_odgovora_ne_uključuje_pauzu_pristojnosti():
+    """`elapsed_ms` je ono što server radi, ne ono što mi čekamo.
+
+    Inače pravilo eskalacije „početna odgovara > 1500 ms" pali za svakoga ko je
+    čekao u redu, i gubi smisao zbog kog postoji (cdei.rs).
+    """
+    with FakeSite() as site:
+        snapshot = scan(site, **{"http.delay_ms": [300, 300], "http.max_requests_per_domain": 6})
+    uzorak = snapshot.pages[1:]
+    assert uzorak, "uzorak mora da ima bar jednu stranicu"
+    assert all(p.elapsed_ms < 250 for p in uzorak), [p.elapsed_ms for p in uzorak]
+
+
+class IndexPhpSajt(FakeSite):
+    """PHP sa PATH_INFO: `/index.php/bilo-sta` vraća 200, a pravi 404 radi."""
+
+    def route(self, path: str) -> Response:
+        if path == "/":
+            return Response(b"", status=302, headers={"Location": "/index.php"})
+        if path == "/index.php" or path.startswith("/index.php/"):
+            return super().route("/")
+        return super().route(path)
+
+
+def test_sonde_idu_na_poreklo_a_ne_na_putanju_pocetne():
+    """Sonda `/index.php/<token>` bi na PHP sajtu vratila 200 → lažni `infra.soft404` (high)."""
+    with IndexPhpSajt() as site:
+        snapshot = scan(site)
+        ocekivano = probe_urls(site.base_url, site.base_url)
+
+    assert snapshot.home.final_url.endswith("/index.php")
+    assert [p.url for p in snapshot.soft404.probes] == ocekivano
+    assert run_level(1, snapshot)["infra.soft404"].status == "ok"
+
+
+class IstekaoSertifikat(Fetcher):
+    """Bez pravog TLS servera: provera sertifikata pada, dohvat bez provere uspeva."""
+
+    async def _send(self, url: str, *, verify: bool) -> Outcome:
+        if verify:
+            return Outcome(url=url, error_kind="tls", error_detail="certificate has expired")
+        if url.endswith("/"):
+            return Outcome(url=url, status=200, final_url=url, redirect_chain=[url], body=html("Početna"))
+        return Outcome(url=url, status=404, final_url=url, redirect_chain=[url], body=b"")
+
+
+def test_tls_greska_ostaje_u_dokazu_i_kad_ponovni_dohvat_uspe():
+    """Istekao sertifikat je najjači nalaz za prodaju — bez razloga je samo „nepoznata"."""
+    cfg = load_config()
+    cfg["http"]["delay_ms"] = [0, 0]
+
+    async def run():
+        async with IstekaoSertifikat(cfg) as fetcher:
+            return await fetch_site(fetcher, DomainInput(domain="istekao.test"))
+
+    snapshot = asyncio.run(run())
+    assert snapshot.entry.status == 200
+    assert snapshot.entry.tls.valid is False
+    assert snapshot.entry.tls.error == "certificate has expired"
+    nalaz = run_level(1, snapshot)["infra.tls.invalid"]
+    assert nalaz.status == "finding"
+    assert "certificate has expired" in nalaz.findings[0].message_tech

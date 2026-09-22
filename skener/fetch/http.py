@@ -190,17 +190,18 @@ class Fetcher:
 
         host = host_of(url) or url
         lock = self._host_locks.setdefault(host, asyncio.Lock())
-        started = time.monotonic()
 
         # Pauza se čeka pod ključem hosta ali van globalnog semafora, da spavanje
         # ne drži slot koji drugi domen može da koristi.
         async with lock:
             await self._wait_turn(host, crawl_delay)
             async with self._global:
+                # Meri se samo rad servera. Čekanje u redu i pauza pristojnosti su naše
+                # vreme — sa njima „početna odgovara > 1500 ms" pali svakome (§6).
+                started = time.monotonic()
                 outcome = await self._send(url, verify=verify)
+                outcome.elapsed_ms = int((time.monotonic() - started) * 1000)
             self._host_next_allowed[host] = time.monotonic() + random.uniform(*self._delay_range)
-
-        outcome.elapsed_ms = int((time.monotonic() - started) * 1000)
 
         if outcome.status in ODUSTANI_STATUSI:
             budget.abort(f"server vratio {outcome.status}, odustajem od domena za ovaj prolaz")
@@ -264,8 +265,9 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
         scanner_version=__version__,
     )
 
-    entry_outcome, verify = await _fetch_entry(fetcher, domain, budget, snapshot)
-    snapshot.entry = _entry_from(entry_outcome, verify)
+    entry_outcome, tls_error = await _fetch_entry(fetcher, domain, budget, snapshot)
+    snapshot.entry = _entry_from(entry_outcome, tls_error)
+    verify = tls_error is None
     if entry_outcome.error_kind == "dns":
         snapshot.budget = budget.snapshot()
         return snapshot
@@ -303,8 +305,10 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     sample = sitemap_parser.sample(base_url, allowed, get(cfg, "sitemap.sample_size"))
 
     await _fetch_sample(fetcher, sample[1:], budget, snapshot, verify=verify, crawl_delay=crawl_delay)
+    # Sonde idu na poreklo, ne na putanju početne: `/index.php/<token>` na PHP-u
+    # vraća 200 preko PATH_INFO-a i daje lažni `infra.soft404` (§5.2).
     await _probe_soft404(
-        fetcher, domain, base_url, budget, snapshot, verify=verify, crawl_delay=crawl_delay
+        fetcher, domain, origin, budget, snapshot, verify=verify, crawl_delay=crawl_delay
     )
 
     snapshot.budget = budget.snapshot()
@@ -329,8 +333,12 @@ def entry_candidates(domain: str) -> list[str]:
 
 async def _fetch_entry(
     fetcher: Fetcher, domain: str, budget: DomainBudget, snapshot: SiteSnapshot
-) -> tuple[Outcome, bool]:
-    """https pa http; nevalidan sertifikat je nalaz, ne razlog da domen ispadne (§4.6)."""
+) -> tuple[Outcome, str | None]:
+    """https pa http; nevalidan sertifikat je nalaz, ne razlog da domen ispadne (§4.6).
+
+    Vraća i TLS grešku (`None` = sertifikat prošao): ponovni dohvat bez provere
+    uspe bez greške, pa bi razlog iz dokaza inače nestao.
+    """
     candidates = entry_candidates(domain)
     outcome = await fetcher.request(candidates[0], budget)
 
@@ -339,24 +347,24 @@ async def _fetch_entry(
         # da ti ceo domen ispadne iz izveštaja — zato se dohvat ponavlja bez provere.
         snapshot.errors.append(SnapshotError("entry", "tls", outcome.error_detail or ""))
         retry = await fetcher.request(candidates[0], budget, verify=False)
-        return (retry if retry.ok else outcome), False
+        return (retry if retry.ok else outcome), outcome.error_detail or "nepoznata TLS greška"
 
     if not outcome.ok and outcome.error_kind not in {"dns", "budget"} and len(candidates) > 1:
         snapshot.errors.append(SnapshotError("entry", outcome.error_kind or "?", outcome.error_detail or ""))
         fallback = await fetcher.request(candidates[1], budget)
         if fallback.ok:
-            return fallback, True
-    return outcome, True
+            return fallback, None
+    return outcome, None
 
 
-def _entry_from(outcome: Outcome, tls_valid: bool) -> Entry:
+def _entry_from(outcome: Outcome, tls_error: str | None) -> Entry:
     return Entry(
         requested_url=outcome.url,
         final_url=outcome.final_url,
         redirect_chain=outcome.redirect_chain,
         status=outcome.status,
         elapsed_ms=outcome.elapsed_ms,
-        tls=Tls(valid=tls_valid, error=None if tls_valid else outcome.error_detail),
+        tls=Tls(valid=tls_error is None, error=tls_error),
         error_kind=outcome.error_kind,
         error_detail=outcome.error_detail,
     )
@@ -476,7 +484,7 @@ def probe_urls(domain: str, origin: str) -> list[str]:
 async def _probe_soft404(
     fetcher: Fetcher,
     domain: str,
-    base_url: str,
+    origin: str,
     budget: DomainBudget,
     snapshot: SiteSnapshot,
     *,
@@ -484,7 +492,7 @@ async def _probe_soft404(
     crawl_delay: float | None,
 ) -> None:
     probes: list[Soft404Probe] = []
-    for url in probe_urls(domain, base_url):
+    for url in probe_urls(domain, origin):
         outcome = await fetcher.request(
             url, budget, verify=verify, crawl_delay=crawl_delay, retries=0
         )
@@ -516,30 +524,34 @@ async def scan_domains(
     """Snapshot ide na disk čim je domen gotov — ako proces pukne na 190., imaš 189 (§8.2)."""
     targets = list(targets)
     results: list[SiteSnapshot] = []
+    # Budžet od 25 s je za rad na domenu, ne za čekanje u redu iza ostalih 199:
+    # `DomainBudget` nastaje u `fetch_site`, pa domen ulazi tamo tek kad dobije red.
+    in_flight = asyncio.Semaphore(get(config, "http.domain_concurrency"))
 
     async with Fetcher(config) as fetcher:
 
         async def one(target: DomainInput) -> SiteSnapshot:
-            log.info("nivo 1 počinje", extra={"domain": target.domain})
-            try:
-                snapshot = await fetch_site(fetcher, target)
-            except Exception as exc:  # noqa: BLE001 — granica domena
-                log.error("nivo 1 pukao: %s", exc, extra={"domain": target.domain})
-                snapshot = SiteSnapshot(
-                    domain=target.domain,
-                    industry=target.industry,
-                    fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    errors=[SnapshotError("fetch", type(exc).__name__, str(exc))],
+            async with in_flight:
+                log.info("nivo 1 počinje", extra={"domain": target.domain})
+                try:
+                    snapshot = await fetch_site(fetcher, target)
+                except Exception as exc:  # noqa: BLE001 — granica domena
+                    log.error("nivo 1 pukao: %s", exc, extra={"domain": target.domain})
+                    snapshot = SiteSnapshot(
+                        domain=target.domain,
+                        industry=target.industry,
+                        fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        errors=[SnapshotError("fetch", type(exc).__name__, str(exc))],
+                    )
+                if snapshot_dir is not None:
+                    store.write_site(snapshot_dir, snapshot)
+                log.info(
+                    "nivo 1 gotov: %d stranica, %d zahteva",
+                    len(snapshot.pages),
+                    snapshot.budget.requests_made,
+                    extra={"domain": target.domain},
                 )
-            if snapshot_dir is not None:
-                store.write_site(snapshot_dir, snapshot)
-            log.info(
-                "nivo 1 gotov: %d stranica, %d zahteva",
-                len(snapshot.pages),
-                snapshot.budget.requests_made,
-                extra={"domain": target.domain},
-            )
-            return snapshot
+                return snapshot
 
         # Goli `gather` bi jednim izuzetkom oborio ceo prolaz — tačno greška iz §8.2.
         gathered = await asyncio.gather(*(one(t) for t in targets), return_exceptions=True)

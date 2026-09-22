@@ -206,6 +206,3 @@ jedne adrese udara dvesta sajtova, i administrator koji te blokira postupa ispra
 - Provera strukturiranih podataka (`schema.org`) — za restorane i klinike ima stvarnu vrednost.
 - Prepoznavanje CMS-a (WordPress, Wix, custom) — menja formulaciju ponude.
 
-## Licenca
-
-MIT.

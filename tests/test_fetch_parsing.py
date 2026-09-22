@@ -124,6 +124,13 @@ def test_uzorkovanje_ne_duplira_pocetnu():
     assert picked == ["https://d.rs/", "https://d.rs/a"]
 
 
+def test_uzorkovanje_preskace_tudje_domene():
+    """Sitemap je tuđ sadržaj: strani host iz njega ne sme da troši budžet ovog domena."""
+    urls = ["https://drugi.rs/a", "https://www.d.rs/usluge", "https://d.rs/o-nama"]
+    picked = sitemap.sample("https://d.rs/", urls, 8)
+    assert picked == ["https://d.rs/", "https://d.rs/o-nama", "https://www.d.rs/usluge"]
+
+
 def test_uzorkovanje_postuje_velicinu():
     urls = [f"https://d.rs/g{i}/x" for i in range(50)]
     assert len(sitemap.sample("https://d.rs/", urls, 8)) == 8

@@ -6,22 +6,30 @@ vremena, sonde, TLS dokaz) bila su nevidljiva baš zbog toga. Ova lista postoji 
 
 Radi se lokalno, na mašini sa pravom mrežom. Rezultat nije „prošlo/palo", nego `docs/kalibracija.md`.
 
-## 0. Priprema (5 min)
+## 0. Priprema (10 min, prvi build povlači ~2 GB)
+
+Sve ide kroz Docker: ista slika, ista verzija Chromium-a i Python-a kao u CI-ju. Ako se
+tvoj rezultat razlikuje od mog, razlika je u mreži i sajtovima, ne u okruženju.
 
 ```bash
 git pull origin claude/quirky-wozniak-u6p6xn
-pip install -e '.[dev]'
-playwright install chromium
-pytest -q                          # mora biti zeleno pre ičega drugog
+mkdir -p rad                                    # ulaz i izlaz; kod ostaje u slici
+export SKENER_UID=$(id -u) SKENER_GID=$(id -g)  # Linux: da izveštaji pripadaju tebi
+docker compose build
+docker compose run --rm skener pytest -q        # mora biti 327 passed pre ičega drugog
 ```
+
+Ako ijedan test preskoči sa „Chromium se ne pokreće", slika nije dobra i dalje se ne ide.
 
 ## 1. Ispitni skup: specifikacija naspram stvarnosti (10 min)
 
 ```bash
-pytest -m live -v 2>&1 | tee live.txt
-skener record domains.example.csv --out snimci/      # NE preko tests/fixtures/ — još
-python scripts/metrike.py snimci/
+docker compose run --rm skener pytest -m live -v 2>&1 | tee rad/live.txt
+docker compose run --rm skener skener record domains.example.csv --out /rad/snimci
+docker compose run --rm skener python scripts/metrike.py /rad/snimci | tee rad/metrike-ispitni.txt
 ```
+
+`record` namerno ne piše preko `tests/fixtures/`: prvo gledamo razliku, pa tek onda menjamo fixture-e.
 
 Svaki pad u `live.txt` je jedno od tri, i treba reći koje:
 
@@ -33,15 +41,17 @@ Svaki pad u `live.txt` je jedno od tri, i treba reći koje:
 
 ## 2. Pravi prolaz: 30–50 domena iz tvoje liste leadova (20 min)
 
+Stavi listu u `rad/leads.csv` (zaglavlje `domain,industry,note`).
+
 ```bash
-time skener scan leads.csv --out izvestaj/ 2>&1 | tee prolaz.log
-python scripts/metrike.py izvestaj/snapshots/ | tee metrike.txt
+time docker compose run --rm skener skener scan /rad/leads.csv --out /rad/izvestaj 2>&1 | tee rad/prolaz.log
+docker compose run --rm skener python scripts/metrike.py /rad/izvestaj/snapshots | tee rad/metrike.txt
 ```
 
 Kad neki domen izgleda čudno:
 
 ```bash
-skener scan leads.csv --only cudan.rs --debug-domain cudan.rs --out /tmp/debug/
+docker compose run --rm skener skener scan /rad/leads.csv --only cudan.rs --debug-domain cudan.rs --out /rad/debug
 ```
 
 ## 3. Kriterijumi — uslov za v2
@@ -60,9 +70,9 @@ tačan / lažno pozitivan / tačan ali nebitan. Isto za poslednjih 5, da proveri
 
 ## 4. Šta mi šalješ nazad
 
-1. `live.txt`
-2. `metrike.txt` za oba prolaza (ispitni skup i leadovi)
-3. `izvestaj/summary.csv` i `izvestaj/findings.csv`
+1. `rad/live.txt`
+2. `rad/metrike-ispitni.txt` i `rad/metrike.txt`
+3. `rad/izvestaj/summary.csv` i `rad/izvestaj/findings.csv`
 4. ručne ocene za prvih 5 i poslednjih 5
 5. sve što ti je zapalo za oko, čak i ako ne umeš da objasniš zašto
 
@@ -70,6 +80,14 @@ Snapshote ne šalji. Sadrže sirovi HTML tuđih sajtova, a sve što nam treba iz
 
 ## 5. Posle toga
 
-Svaka odluka ide u `docs/kalibracija.md` u obliku **prag — zapažanje — odluka**, a izmene u `skener.toml`
-se proveravaju sa `skener recheck izvestaj/snapshots/ --out novi/`, bez ponovnog skidanja sajtova.
-Tek kad su svi kriterijumi iz tačke 3 zeleni: `skener record … --out tests/fixtures/`, `git diff`, i v2.
+Svaka odluka ide u `docs/kalibracija.md` u obliku **prag — zapažanje — odluka**. Pragovi se probaju u
+`rad/kalibracija.toml`, koji sadrži samo ono što menjaš, jer se `--config` spaja preko `skener.toml`.
+Tako nema rebuild-a slike između dva pokušaja, a nema ni ponovnog skidanja sajtova:
+
+```bash
+docker compose run --rm skener skener recheck /rad/izvestaj/snapshots --config /rad/kalibracija.toml --out /rad/novi
+```
+
+Kad je prag odlučen, prenosi se u `skener.toml` i ide u commit.
+
+Tek kad su svi kriterijumi iz tačke 3 zeleni: novi snimak u `tests/fixtures/`, `git diff`, i v2.

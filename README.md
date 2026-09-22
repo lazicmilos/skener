@@ -29,6 +29,16 @@ playwright install chromium      # jednom, za nivo 2
 
 Traži Python 3.11+ (`tomllib` je od tada u standardnoj biblioteci).
 
+Ili bez ičega lokalnog osim Docker-a. Slika ima Chromium tačno za verziju Playwright-a iz
+`pyproject.toml`, pa se nivo 2 ponaša isto na svakoj mašini:
+
+```bash
+mkdir -p rad
+docker compose build
+docker compose run --rm skener pytest -q
+docker compose run --rm skener skener scan /rad/domains.csv --out /rad/izvestaj
+```
+
 ## Upotreba
 
 ```bash

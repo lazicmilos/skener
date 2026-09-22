@@ -92,11 +92,13 @@ snapshota, orkestracija). Sva četiri baga iz revizije su bila tu. Kandidat za p
 | Potkarakteristika | Kako | Dokaz |
 |---|---|---|
 | instalabilnost | `pip install -e .`; nivo 2 opcion (`.[browser]`) | `pyproject.toml` |
+| instalabilnost | Docker slika zaključana digest-om, sa Chromium-om za tačnu verziju Playwright-a; radi bez root-a | `Dockerfile`, `compose.yaml`, CI posao `docker` |
 | prilagodljivost | sistemski Chromium preko `SKENER_CHROMIUM` / `browser.executable_path` | `browser._launch_options` |
 | prilagodljivost | browser testovi se preskaču uz razlog kad Chromium ne može da se pokrene | `chromium_se_pokrece` u `test_fetch_browser.py` |
 | zamenljivost | Playwright je zakucan u `dev`, jer paket traži tačno svoju reviziju Chromium-a | `pyproject.toml` |
 
-**Rupe.** Testirano samo na Linuxu i Python-u 3.11. Windows (putanje, `asyncio` event loop) nije proveren.
+**Rupe.** Van Docker-a testirano samo na Linuxu (Python 3.11 u CI-ju, 3.12 u slici). Windows bez Docker-a
+(putanje, `asyncio` event loop) nije proveren.
 
 ---
 

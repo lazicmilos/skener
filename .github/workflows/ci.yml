@@ -40,3 +40,16 @@ jobs:
               exit 1
             }
           done < <(tail -n +3 /tmp/registar.md)
+
+  docker:
+    # Isto okruženje u kome se pušta pravi prolaz. Bez ovog posla Dockerfile se tiho
+    # pokvari prvi put kad se promeni verzija Playwright-a u pyproject.toml.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker compose build
+
+      - name: Testovi u kontejneru
+        run: docker compose run --rm --user "$(id -u):$(id -g)" skener pytest -q

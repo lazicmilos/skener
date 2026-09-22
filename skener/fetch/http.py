@@ -16,15 +16,14 @@ import random
 import socket
 import ssl
 import time
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import httpx
 
-from skener import __version__
-from skener import store
+from skener import __version__, store
 from skener.config import get
 from skener.fetch import page as page_builder
 from skener.fetch import robots as robots_parser
@@ -35,8 +34,8 @@ from skener.models import (
     DomainInput,
     Entry,
     RobotsInfo,
-    SiteSnapshot,
     SitemapInfo,
+    SiteSnapshot,
     SnapshotError,
     Soft404,
     Soft404Probe,
@@ -146,7 +145,7 @@ class Fetcher:
         self._insecure: httpx.AsyncClient | None = None
 
     # ---------------------------------------------------------------- lifecycle
-    async def __aenter__(self) -> "Fetcher":
+    async def __aenter__(self) -> Fetcher:
         self._client = self._make_client(verify=True)
         return self
 
@@ -261,7 +260,7 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     snapshot = SiteSnapshot(
         domain=domain,
         industry=target.industry,
-        fetched_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         scanner_version=__version__,
     )
 
@@ -529,7 +528,7 @@ async def scan_domains(
                 snapshot = SiteSnapshot(
                     domain=target.domain,
                     industry=target.industry,
-                    fetched_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     errors=[SnapshotError("fetch", type(exc).__name__, str(exc))],
                 )
             if snapshot_dir is not None:
@@ -545,7 +544,7 @@ async def scan_domains(
         # Goli `gather` bi jednim izuzetkom oborio ceo prolaz — tačno greška iz §8.2.
         gathered = await asyncio.gather(*(one(t) for t in targets), return_exceptions=True)
 
-    for target, item in zip(targets, gathered):
+    for target, item in zip(targets, gathered, strict=True):
         if isinstance(item, BaseException):
             log.error("domen izgubljen: %r", item, extra={"domain": target.domain})
             results.append(SiteSnapshot(domain=target.domain, industry=target.industry))

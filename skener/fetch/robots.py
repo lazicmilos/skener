@@ -8,6 +8,7 @@ ima je alat kome ne možeš da veruješ (§15, zamka 7).
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
@@ -64,10 +65,8 @@ def parse(body: str | None) -> RobotsRules:
         elif field_name == "allow" and value:
             allow.append(value)
         elif field_name == "crawl-delay":
-            try:
+            with contextlib.suppress(ValueError):
                 crawl_delay = float(value.replace(",", "."))
-            except ValueError:
-                pass
 
     return RobotsRules(tuple(disallow), tuple(allow), crawl_delay, tuple(sitemaps))
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import copy
 
 import pytest
-
 from factories import clean_site, findings, run_level, statuses
+
 from skener.checks import registry
 from skener.models import Entry, Soft404, Soft404Probe, Tls
 

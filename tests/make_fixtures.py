@@ -33,8 +33,8 @@ from skener.models import (
     OversizedImage,
     PageSnapshot,
     RobotsInfo,
-    SiteSnapshot,
     SitemapInfo,
+    SiteSnapshot,
     Soft404,
     Soft404Probe,
     TimingStats,
@@ -115,7 +115,10 @@ def sajt(
             status=200,
             elapsed_ms=elapsed_ms,
         ),
-        robots=RobotsInfo(status=robots_status, body="User-agent: *\nDisallow:\n" if robots_status == 200 else None),
+        robots=RobotsInfo(
+            status=robots_status,
+            body="User-agent: *\nDisallow:\n" if robots_status == 200 else None,
+        ),
         sitemap=SitemapInfo(
             status=sitemap_status,
             url=f"{origin}/sitemap.xml",

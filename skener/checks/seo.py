@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable
+from collections.abc import Callable
 
 from skener.checks.registry import Context, check, finding, ok, unknown
 from skener.fetch.urls import collapse_ws, path_group
@@ -83,10 +83,14 @@ def canonical_missing(snapshot: SiteSnapshot, ctx: Context):
         "({canonical}). Za Google to znači da sajt praktično ima jednu stranicu — ostalih "
         "{n} se ne takmiči ni za šta u pretrazi."
     ),
-    tech="canonical_normalized == {canonical} na {stranica} stranica iz {grupa_putanja} grupa putanja (uzorak: {uzorak})",
+    tech=(
+        "canonical_normalized == {canonical} na {stranica} stranica "
+        "iz {grupa_putanja} grupa putanja (uzorak: {uzorak})"
+    ),
 )
 def canonical_duplicate(snapshot: SiteSnapshot, ctx: Context):
-    hit = _duplicates(snapshot, lambda p: p.canonical_normalized, ctx.th("thresholds.seo.duplicate_min_pages"))
+    min_pages = ctx.th("thresholds.seo.duplicate_min_pages")
+    hit = _duplicates(snapshot, lambda p: p.canonical_normalized, min_pages)
     if not hit:
         return ok(canonical_duplicate.spec)
     value, pages, groups = hit

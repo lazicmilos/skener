@@ -9,8 +9,8 @@ import json
 import logging
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from skener import __version__, store
 from skener.checks import registry
@@ -308,8 +308,12 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--level", choices=["1", "2", "auto"], default="auto", help="podrazumevano: auto")
     scan.add_argument("--concurrency", type=int, metavar="N", help="globalni semafor (podrazumevano 8)")
     scan.add_argument("--max-level2", type=int, metavar="N", help="gornji limit za nivo 2 (60)")
-    scan.add_argument("--snapshots", metavar="DIR", help="gde se pišu snapshoti (podrazumevano: OUT/snapshots)")
-    scan.add_argument("--only", action="append", default=[], metavar="DOMAIN", help="samo ovaj domen; može više puta")
+    scan.add_argument(
+        "--snapshots", metavar="DIR", help="gde se pišu snapshoti (podrazumevano: OUT/snapshots)"
+    )
+    scan.add_argument(
+        "--only", action="append", default=[], metavar="DOMAIN", help="samo ovaj domen; može više puta"
+    )
     add_common(scan)
     scan.set_defaults(func=cmd_scan)
 

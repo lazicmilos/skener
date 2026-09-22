@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import csv
 import json
-from pathlib import Path
 
 import pytest
-
 from localserver import FakeSite, Response, html
+
 from skener import cli
 from skener.config import load_config
 from skener.models import DomainReport, Finding
@@ -57,7 +56,7 @@ def prolaz(tmp_path_factory):
     ispod gledaju isti rezultat.
     """
     tmp_path = tmp_path_factory.mktemp("prolaz")
-    # `--config` se spaja preko skener.toml; ovde gasimo pauze da testovi ne traju minут.
+    # `--config` se spaja preko skener.toml; ovde gasimo pauze da testovi ne traju minut.
     config = tmp_path / "brzo.toml"
     config.write_text("[http]\ndelay_ms = [0, 0]\n", encoding="utf-8")
 
@@ -123,6 +122,27 @@ def test_html_je_samostalan(prolaz):
     assert "cdn" not in page.lower()
     assert 'src="http' not in page and "@import" not in page
     assert "0,6 MB/s" in page or "MB/s" in page, "pretpostavka za brzinu mora biti u fusnoti (§10.3)"
+
+
+def test_record_snima_gzipovane_fixture_e(tmp_path):
+    """§12.2: bez sirovog HTML-a ostalih strana, inače repo naraste."""
+    from skener import store
+
+    config = tmp_path / "brzo.toml"
+    config.write_text("[http]\ndelay_ms = [0, 0]\n", encoding="utf-8")
+    with FakeSite() as site:
+        domains = tmp_path / "d.csv"
+        domains.write_text(f"domain,industry\n{site.base_url},hotel\n", encoding="utf-8")
+        out = tmp_path / "fixtures"
+        code = cli.main(
+            ["record", str(domains), "--out", str(out), "--level", "1", "--config", str(config)]
+        )
+
+    assert code == 0
+    assert list(out.glob("*/site.json.gz")), "fixture-i se pišu gzipovani"
+    (snimljen, _browser) = next(iter(store.read_all(out)))
+    assert snimljen.home.raw_html, "sirovi HTML početne ostaje (treba za eskalaciju)"
+    assert all(p.raw_html is None for p in snimljen.pages[1:])
 
 
 # --------------------------------------------------------------------------- #

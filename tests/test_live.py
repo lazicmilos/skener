@@ -13,12 +13,12 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from test_ispitni_skup import OCEKIVANO
 
 from skener.checks import registry
 from skener.config import load_config
 from skener.models import DomainInput
 from skener.score import analyze, escalation_reasons
-from test_ispitni_skup import OCEKIVANO
 
 pytestmark = pytest.mark.live
 

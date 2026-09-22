@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
 from factories import clean_browser, findings, run_level, statuses
+
 from skener.checks import registry
 from skener.models import DomStats, NetworkStats, OversizedImage, TimingStats
 
@@ -34,7 +34,13 @@ POZITIVNI = {
         b.dom,
         "oversized_images",
         [
-            OversizedImage(src=f"https://cist.rs/s{i}.jpg", natural=[4000, 2667], client=[760, 507], ratio=5.26, est_waste_kb=600)
+            OversizedImage(
+                src=f"https://cist.rs/s{i}.jpg",
+                natural=[4000, 2667],
+                client=[760, 507],
+                ratio=5.26,
+                est_waste_kb=600,
+            )
             for i in range(3)
         ],
     ),
@@ -194,6 +200,12 @@ def test_veliki_visak_bajtova_pali_nalaz_i_ispod_tri_slike():
     """Prag je ≥ 3 slike **ili** višak > 700 kB (§7.3)."""
     browser = clean_browser()
     browser.dom.oversized_images = [
-        OversizedImage(src="https://cist.rs/hero.jpg", natural=[4000, 2667], client=[760, 507], ratio=5.26, est_waste_kb=1840)
+        OversizedImage(
+            src="https://cist.rs/hero.jpg",
+            natural=[4000, 2667],
+            client=[760, 507],
+            ratio=5.26,
+            est_waste_kb=1840,
+        )
     ]
     assert run_level(2, browser)["perf.img.oversized"].status == "finding"

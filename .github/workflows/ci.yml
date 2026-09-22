@@ -21,6 +21,9 @@ jobs:
       - name: Instaliraj
         run: pip install -e '.[dev]'
 
+      - name: Lint
+        run: ruff check skener/ tests/
+
       - name: Instaliraj Chromium
         run: playwright install --with-deps chromium
 

@@ -11,8 +11,9 @@ snapshotu, dodaj polje.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from skener.config import get
 from skener.models import CheckResult, Finding
@@ -144,6 +145,10 @@ REQUIREMENTS: dict[str, tuple[Callable[[Any], bool], str]] = {
     "entry": (
         lambda s: s.entry is not None,
         "početna strana nije ni pokušana (budžet potrošen pre nje)",
+    ),
+    "entry_response": (
+        lambda s: s.entry is not None and s.entry.status is not None,
+        "početna nije vratila nijedan odgovor (mrežna greška pre HTTP-a)",
     ),
     "home": (_home_ok, "početna strana nije uspešno dohvaćena"),
     "home_html": (

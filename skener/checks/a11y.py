@@ -21,7 +21,10 @@ IZLOZENE_DELATNOSTI = {"zdravstvo", "institucija"}
     base_severity="low",
     requires=["browser"],
     description="Većina slika nema alt atribut (prazan alt se ne broji).",
-    threshold="≥ 5 slika i udeo bez alt atributa > 0,5; > 0,8 uz ≥ 15 slika → high; zdravstvo/institucija → bar medium",
+    threshold=(
+        "≥ 5 slika i udeo bez alt atributa > 0,5; > 0,8 uz ≥ 15 slika → high; "
+        "zdravstvo/institucija → bar medium"
+    ),
     message=(
         "{bez_alta} od {ukupno} slika nema tekstualni opis. Google ne zna šta je na njima, a "
         "posetioci koji koriste čitače ekrana ih ne mogu razumeti."

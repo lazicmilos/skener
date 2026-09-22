@@ -13,6 +13,8 @@ import typing
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from skener import __version__
+
 Severity = Literal["critical", "high", "medium", "low"]
 Category = Literal["seo", "social", "i18n", "infra", "perf", "a11y", "qa"]
 CheckStatus = Literal["ok", "finding", "unknown"]
@@ -146,7 +148,6 @@ class PageSnapshot:
     lang: str | None = None
     hreflang: list[str] = field(default_factory=list)
     h1_count_raw: int = 0
-    img_count_raw: int = 0
     text_sample: str = ""
     text_length: int = 0
     raw_html: str | None = None  # samo za početnu stranu (§3.2)
@@ -173,16 +174,6 @@ class Soft404:
 
 
 @dataclass
-class HostVariant:
-    """Jedna od četiri varijante hosta (§5.3)."""
-
-    requested_url: str
-    final_url: str | None = None
-    status: int | None = None
-    error: str | None = None
-
-
-@dataclass
 class SnapshotError:
     stage: str
     kind: str
@@ -205,13 +196,12 @@ class SiteSnapshot:
     domain: str
     industry: str = "ostalo"
     fetched_at: str = ""
-    scanner_version: str = __import__("skener").__version__
+    scanner_version: str = __version__
     entry: Entry | None = None
     robots: RobotsInfo = field(default_factory=RobotsInfo)
     sitemap: SitemapInfo = field(default_factory=SitemapInfo)
     pages: list[PageSnapshot] = field(default_factory=list)
     soft404: Soft404 = field(default_factory=Soft404)
-    host_variants: list[HostVariant] | None = None
     sample_source: Literal["sitemap", "links", "none"] = "none"
     budget: Budget = field(default_factory=Budget)
     errors: list[SnapshotError] = field(default_factory=list)
@@ -271,7 +261,7 @@ class BrowserSnapshot:
     domain: str
     url: str = ""
     fetched_at: str = ""
-    scanner_version: str = __import__("skener").__version__
+    scanner_version: str = __version__
     status: Literal["ok", "partial", "failed"] = "failed"
     network: NetworkStats = field(default_factory=NetworkStats)
     timing: TimingStats = field(default_factory=TimingStats)

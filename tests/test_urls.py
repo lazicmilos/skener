@@ -39,6 +39,27 @@ def test_normalize_table(url, base, expected):
     assert normalize(url, base) == expected
 
 
+@pytest.mark.parametrize(
+    "url",
+    [expected for _, _, expected in CASES if expected]
+    + [
+        "https://šumadija.rs/Čačak",
+        "https://d.rs/a%20b?x=a%26b",
+        "https://d.rs/a?utm_source=x&strana=2",
+        "https://d.rs/a/?q=1#f",
+        "http://[::1]:8080/a/",
+    ],
+)
+def test_normalize_je_idempotentan(url):
+    """Normalizovan URL koji se ponovo normalizuje mora ostati isti.
+
+    Inače je isti canonical „različit" zavisno od toga koliko puta je prošao
+    kroz `normalize`, a na tome stoji svaki `*.duplicate` nalaz.
+    """
+    once = normalize(url)
+    assert normalize(once) == once
+
+
 def test_www_se_ne_uklanja():
     """§4.5 tačka 7: www i non-www jesu različite adrese za Google."""
     assert normalize("https://www.d.rs/a") != normalize("https://d.rs/a")

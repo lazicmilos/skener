@@ -34,6 +34,8 @@ def normalize(url: str | None, base: str | None = None) -> str | None:
         return None
 
     host = parts.hostname.rstrip(".")
+    if ":" in host:  # IPv6 literal: `hostname` skida zagrade, a bez njih URL ne parsira
+        host = f"[{host}]"
     if parts.port and parts.port != DEFAULT_PORTS[parts.scheme]:
         host = f"{host}:{parts.port}"
 

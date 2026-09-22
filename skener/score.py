@@ -147,3 +147,21 @@ def select_for_level2(
         key=lambda pair: (-level1_score(pair[0], pair[1], config), pair[0].domain),
     )
     return [site for site, _ in scored[:limit]]
+
+
+def analyze(
+    site: SiteSnapshot,
+    config: dict,
+    *,
+    browser: BrowserSnapshot | None = None,
+    escalation: Sequence[str] = (),
+) -> DomainReport:
+    """Snapshoti → provere → bodovan izveštaj. Bez I/O, pa `recheck` ide bez mreže."""
+    from skener.checks import registry
+
+    registry.load_all()
+    ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)
+    results = list(registry.run(1, site, ctx))
+    if browser is not None:
+        results.extend(registry.run(2, browser, ctx))
+    return build_report(site, results, config, browser=browser, escalation_reasons=escalation)

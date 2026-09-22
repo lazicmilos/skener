@@ -22,7 +22,7 @@ jobs:
         run: pip install -e '.[dev]'
 
       - name: Lint
-        run: ruff check skener/ tests/
+        run: ruff check skener/ tests/ scripts/
 
       - name: Instaliraj Chromium
         run: playwright install --with-deps chromium

@@ -181,6 +181,9 @@ test kvari tačno jednu stvar i tvrdi da nije probudio ostale provere.
 > tamo danas. Proveravaju da lanac provera radi — ne da su domeni u tom stanju. Zameni ih pravim
 > snimcima sa `skener record domains.example.csv --out tests/fixtures/` i pogledaj `git diff`.
 
+Pre v2 alat mora da prođe [proveru na pravim sajtovima](docs/provera-na-pravim-sajtovima.md) sa
+merljivim kriterijumima. Pregled kroz ISO/IEC 25010, sa dokazima i rupama, je u [`docs/kvalitet.md`](docs/kvalitet.md).
+
 ## Etika
 
 ```

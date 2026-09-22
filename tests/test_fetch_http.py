@@ -11,9 +11,9 @@ import socket
 
 import httpx
 import pytest
-
 from factories import run_level
 from localserver import FakeSite, Response, html
+
 from skener import store
 from skener.config import load_config
 from skener.fetch.http import (

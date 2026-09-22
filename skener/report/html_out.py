@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import html
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from skener import __version__
 from skener.config import get

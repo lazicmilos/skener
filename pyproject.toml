@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 browser = ["playwright>=1.44"]
-dev = ["pytest>=8", "playwright>=1.44"]
+dev = ["pytest>=8", "playwright>=1.44", "ruff>=0.6"]
 
 [project.scripts]
 skener = "skener.cli:main"
@@ -33,3 +33,10 @@ markers = [
     "live: pravi mrežni prolaz nad ispitnim skupom; iskljucen po defaultu (pytest -m live)",
     "browser: trazi instaliran Playwright/Chromium; preskace se ako ga nema",
 ]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

@@ -11,11 +11,13 @@ saobraćaj i sabiraju stvarni odgovori (§7.2).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
-from datetime import datetime, timezone
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 from skener import __version__, store
 from skener.config import get
@@ -187,7 +189,7 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
     snapshot = BrowserSnapshot(
         domain=site.domain,
         url=url,
-        fetched_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         scanner_version=__version__,
     )
     timeout_ms = get(config, "browser.timeout_s") * 1000
@@ -220,12 +222,11 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
             reached = "timeout"
 
         if reached == "load":
-            try:
+            # Mirovanje mreže je poželjno, ne obavezno.
+            with contextlib.suppress(PlaywrightError):
                 await page.wait_for_load_state(
                     "networkidle", timeout=get(config, "browser.idle_after_load_ms")
                 )
-            except PlaywrightError:
-                pass  # mirovanje mreže je poželjno, ne obavezno
 
         # Bez skrola sve lazy slike imaju naturalWidth == 0 i provera tiho nalazi
         # nulu (§15, zamka 2).
@@ -349,7 +350,7 @@ async def capture_all(
         finally:
             await browser.close()
 
-    for site, item in zip(sites, gathered):
+    for site, item in zip(sites, gathered, strict=True):
         if isinstance(item, BaseException):
             log.error("nivo 2 izgubljen: %r", item, extra={"domain": site.domain})
             results[site.domain] = BrowserSnapshot(

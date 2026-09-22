@@ -115,8 +115,16 @@ def soft404(snapshot: SiteSnapshot, ctx: Context):
     tech="TLS greška: {greska}",
 )
 def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
-    tls = snapshot.entry.tls
+    entry = snapshot.entry
+    tls = entry.tls
     if tls.valid:
+        # Veza koja nije ni uspostavljena ne dokazuje da je sertifikat ispravan.
+        # `ok` bi ovde bio tvrdnja koju nismo proverili (§3.4).
+        if entry.status is None:
+            return unknown(
+                tls_invalid.spec,
+                f"veza nije uspostavljena ({entry.error_kind or 'nepoznato'}), sertifikat nije proveren",
+            )
         return ok(tls_invalid.spec)
     return finding(
         tls_invalid.spec,

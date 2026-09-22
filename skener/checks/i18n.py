@@ -13,6 +13,7 @@ DIJAKRITICI = frozenset("čćšžđČĆŠŽĐ")
 
 
 def _is_cyrillic(ch: str) -> bool:
+    """Ceo Unicode blok ćirilice (U+0400–U+04FF)."""
     return "Ѐ" <= ch <= "ӿ"
 
 
@@ -109,7 +110,10 @@ def lang_invalid(snapshot: SiteSnapshot, ctx: Context):
     base_severity="high",
     requires=["home"],
     description="Sadržaj je pouzdano srpski, a lang oznaka govori drugo.",
-    threshold="sadržaj prepoznat kao sr (ćirilica > 30 % ili dijakritici > 0,5 %) uz lang koji ne počinje sa sr",
+    threshold=(
+        "sadržaj prepoznat kao sr (ćirilica > 30 % ili dijakritici > 0,5 %) "
+        "uz lang koji ne počinje sa sr"
+    ),
     message=(
         "Sadržaj sajta je na srpskom, ali je u kodu označen kao „{lang}”. Pretraživači ga "
         "zato nude pogrešnom tržištu, a čitači ekrana ga izgovaraju engleskim izgovorom."

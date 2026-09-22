@@ -7,7 +7,7 @@ logiku, pa mora da se testira bez mreže — što je cela poenta §2.1.
 from __future__ import annotations
 
 import re
-from typing import Mapping
+from collections.abc import Mapping
 
 from selectolax.lexbor import LexborHTMLParser
 

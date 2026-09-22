@@ -67,7 +67,7 @@ def compression_missing(snapshot: SiteSnapshot, ctx: Context):
     level=1,
     category="perf",
     base_severity="low",
-    requires=["entry"],
+    requires=["entry_response"],
     description="Početna se otvara kroz niz preusmerenja.",
     threshold="broj skokova ≥ thresholds.perf.redirect_hops (3)",
     message=(

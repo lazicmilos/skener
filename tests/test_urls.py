@@ -45,7 +45,7 @@ def test_www_se_ne_uklanja():
 
 
 def test_normalize_je_idempotentna():
-    for url, base, expected in CASES:
+    for _url, _base, expected in CASES:
         if expected is not None:
             assert normalize(expected) == expected
 

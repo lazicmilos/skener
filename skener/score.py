@@ -7,7 +7,7 @@ gornjeg limita, prolaze oni sa najvišim (§6).
 
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from skener.config import get, multiplier
 from skener.models import (

@@ -177,11 +177,11 @@ def test_protetica_je_na_dnu_rangiranja(izvestaji):
 # --------------------------------------------------------------------------- #
 def test_fixture_starost_upozorava_a_ne_pada():
     """Kad neki sajt popravi canonical, test i dalje prolazi nad starim snimkom."""
-    danas = dt.datetime.now(dt.timezone.utc)
+    danas = dt.datetime.now(dt.UTC)
     stari = []
     for site, _ in store.read_all(FIXTURES):
         snimljeno = dt.datetime.strptime(site.fetched_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=dt.timezone.utc
+            tzinfo=dt.UTC
         )
         if (danas - snimljeno).days > MAX_STAROST_DANA:
             stari.append(f"{site.domain} ({(danas - snimljeno).days} dana)")

@@ -8,8 +8,8 @@ ovi testovi padaju.
 from __future__ import annotations
 
 import pytest
-
 from factories import CONFIG, clean_site, run_level
+
 from skener.models import CheckResult, Finding
 from skener.score import (
     build_report,

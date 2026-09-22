@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import gzip
 from collections import defaultdict
-from typing import Iterable, Literal
+from collections.abc import Iterable
+from typing import Literal
 from xml.etree import ElementTree
 
 from skener.fetch.urls import normalize, path_group

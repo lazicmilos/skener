@@ -10,9 +10,9 @@ import struct
 import zlib
 
 import pytest
-
 from factories import run_level
 from localserver import FakeSite, Response
+
 from skener.config import load_config
 from skener.fetch.browser import est_waste_kb
 from skener.models import Entry, PageSnapshot, SiteSnapshot

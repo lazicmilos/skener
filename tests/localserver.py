@@ -11,9 +11,9 @@ from __future__ import annotations
 import gzip
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Callable
 
 
 @dataclass
@@ -78,7 +78,7 @@ class FakeSite:
         host, port = self._server.server_address[:2]
         return f"http://{host}:{port}"
 
-    def __enter__(self) -> "FakeSite":
+    def __enter__(self) -> FakeSite:
         self._thread.start()
         return self
 

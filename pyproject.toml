@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skener"
+version = "1.0.0"
+description = "Skener sajtova — rangira domene po tome koji zaslužuju pun ručni audit"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Milos Lazic", email = "miloslazic458@gmail.com" }]
+dependencies = [
+    "httpx>=0.27",
+    "selectolax>=0.3.21",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.44"]
+dev = ["pytest>=8", "playwright>=1.44"]
+
+[project.scripts]
+skener = "skener.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["skener*"]
+
+[tool.setuptools.package-data]
+"skener.report" = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not live' --strict-markers"
+markers = [
+    "live: pravi mrežni prolaz nad ispitnim skupom; iskljucen po defaultu (pytest -m live)",
+    "browser: trazi instaliran Playwright/Chromium; preskace se ako ga nema",
+]

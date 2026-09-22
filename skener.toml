@@ -36,6 +36,9 @@ timeout_s = 25
 idle_after_load_ms = 1500
 scroll_pause_ms = 1000          # bez skrola lazy slike imaju naturalWidth == 0 (§7.1)
 max_unmeasured_responses = 5    # iznad ovoga je merenje težine `unknown`, ne `ok` (§7.2)
+executable_path = ""            # prazno = Playwright-ov Chromium; postavi za sistemski
+                                # Chrome ili kontejner sa gotovim browserom. Može i preko
+                                # promenljive okruženja SKENER_CHROMIUM.
 
 [thresholds.seo]
 duplicate_min_pages = 3         # ≥ 3 stranice iz različitih grupa putanja (§5)

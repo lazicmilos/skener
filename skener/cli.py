@@ -109,7 +109,10 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
     config = load_config(args.config)
     if args.concurrency:
+        # Oba zajedno: više domena u radu nego slotova znači da budžet domena opet
+        # teče dok čeka u redu.
         config["http"]["concurrency"] = args.concurrency
+        config["http"]["domain_concurrency"] = args.concurrency
     if args.max_level2 is not None:
         config["escalation"]["max_level2"] = args.max_level2
 

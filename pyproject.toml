@@ -17,7 +17,9 @@ dependencies = [
 
 [project.optional-dependencies]
 browser = ["playwright>=1.44"]
-dev = ["pytest>=8", "playwright>=1.44", "ruff>=0.6"]
+# Playwright je zakucan: paket traži tačno svoju reviziju Chromium-a, pa nadogradnja
+# bez `playwright install` obori sve browser testove (vidi `chromium_se_pokrece`).
+dev = ["pytest>=8", "playwright==1.56.0", "ruff>=0.6"]
 
 [project.scripts]
 skener = "skener.cli:main"

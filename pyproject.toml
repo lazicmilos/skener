@@ -8,7 +8,6 @@ version = "1.0.0"
 description = "Skener sajtova — rangira domene po tome koji zaslužuju pun ručni audit"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
 authors = [{ name = "Milos Lazic", email = "miloslazic458@gmail.com" }]
 dependencies = [
     "httpx>=0.27",

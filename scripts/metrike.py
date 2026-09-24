@@ -34,6 +34,11 @@ def main(directory: str) -> int:
     unknown = Counter(u.check_id for r in alive for u in r.unknowns)
     reasons = Counter((u.check_id, u.reason) for r in alive for u in r.unknowns)
     entry_errors = Counter(site.entry.error_kind for site, _ in pairs if site.entry and site.entry.error_kind)
+    # Provera koja pali skoro svima ne razlikuje leadove — ili je prag loš, ili je nalaz šum.
+    fired = Counter(check_id for r in alive for check_id in {f.check_id for f in r.findings})
+    browser_failed = Counter(
+        f"{e.kind}: {e.detail[:80]}" for _, b in pairs if b and b.status == "failed" for e in b.errors
+    )
     requests = [site.budget.requests_made for site, _ in pairs]
     seconds = [site.budget.elapsed_ms / 1000 for site, _ in pairs]
 
@@ -47,6 +52,13 @@ def main(directory: str) -> int:
         print("\npotrošen budžet:")
         for reason, count in budget.most_common():
             print(f"  {count:4}  {reason}")
+    if browser_failed:
+        print("\nnivo 2 nije uspeo:")
+        for reason, count in browser_failed.most_common():
+            print(f"  {count:4}  {reason}")
+    print(f"\nnalazi po proveri (udeo od {len(alive)} domena koji nisu `failed`):")
+    for check_id, count in fired.most_common():
+        print(f"  {count / max(len(alive), 1):5.0%}  {check_id}")
     print(f"\nunknown po proveri (udeo od {len(alive)} domena koji nisu `failed`):")
     for check_id, count in unknown.most_common():
         print(f"  {count / max(len(alive), 1):5.0%}  {check_id}")

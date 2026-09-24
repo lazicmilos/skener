@@ -22,6 +22,13 @@ from skener.score import analyze, escalation_reasons
 
 pytestmark = pytest.mark.live
 
+# Nalazi iz §12.4 koje je vlasnik sajta u međuvremenu popravio. Svaki red je
+# proveren ručno nad snimkom — vidi docs/kalibracija.md. Fixture-i i dalje
+# opisuju stanje iz specifikacije, jer proveravaju lanac, ne sajt.
+POPRAVLJENO = {
+    "mensa.rs": {"seo.canonical.duplicate", "infra.soft404"},  # 2026-09-24
+}
+
 
 @pytest.fixture(scope="module")
 def prolaz():
@@ -54,7 +61,7 @@ def test_nalazi_nivoa_1_nad_pravim_sajtom(domain, prolaz):
         check_id
         for check_id in OCEKIVANO[domain][1]
         if registry.REGISTRY[check_id].level == 1
-    }
+    } - POPRAVLJENO.get(domain, set())
     missing = expected_level1 - found
     assert not missing, (
         f"{domain}: specifikacija očekuje {sorted(missing)}, a alat ih ne nalazi. "

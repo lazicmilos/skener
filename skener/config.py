@@ -6,13 +6,27 @@ preko** nje, pa parcijalna korisnička konfiguracija ne gubi ostale pragove.
 
 from __future__ import annotations
 
+import os
 import tomllib
+import unicodedata
 from pathlib import Path
 from typing import Any
 
+from skener import __version__
 from skener.models import CATEGORIES, INDUSTRIES
 
 CONFIG_NAME = "skener.toml"
+
+# Srpska ćirilica i đ nemaju ASCII rastavljanje, pa se presipaju ručno; š, č, ć i ž
+# posle toga rastavlja NFKD. HTTP zaglavlje sme da nosi samo ASCII.
+_U_LATINICU = str.maketrans(
+    {
+        **dict(zip("абвгдежзијклмнопрстћуфхцчш", "abvgdezzijklmnoprstcufhccs", strict=True)),
+        **dict(zip("АБВГДЕЖЗИЈКЛМНОПРСТЋУФХЦЧШ", "ABVGDEZZIJKLMNOPRSTCUFHCCS", strict=True)),
+        "ђ": "dj", "Ђ": "Dj", "љ": "lj", "Љ": "Lj", "њ": "nj", "Њ": "Nj", "џ": "dz", "Џ": "Dz",
+        "đ": "dj", "Đ": "Dj",
+    }
+)
 
 
 class ConfigError(Exception):
@@ -50,6 +64,34 @@ def get(cfg: dict[str, Any], dotted: str) -> Any:
             raise ConfigError(f"nedostaje ključ u konfiguraciji: {dotted}")
         node = node[part]
     return node
+
+
+def _ascii(tekst: str) -> str:
+    """Ime koje kupac upiše kako mu je prirodno → ono što HTTP zaglavlje sme da nosi.
+
+    Srpska slova se presipaju, ostalo (crte, emodžiji) otpada, a razmaci i novi redovi
+    se sažimaju u jedan razmak — novi red bi u zahtevu započeo novo zaglavlje.
+    """
+    rastavljeno = unicodedata.normalize("NFKD", tekst.translate(_U_LATINICU))
+    return " ".join(rastavljeno.encode("ascii", "ignore").decode("ascii").split())
+
+
+def user_agent(cfg: dict[str, Any]) -> str:
+    """User-Agent koji predstavlja operatera — onog ko pokreće skeniranje.
+
+    Administrator sajta u svom logu vidi ko ga skenira i kako da ga kontaktira. Alat
+    se prodaje, pa to mora biti kupac, ne autor alata; bez oba podatka nema
+    skeniranja. `SKENER_NAZIV` i `SKENER_KONTAKT` imaju prednost nad fajlom (Docker).
+    """
+    naziv = _ascii(os.environ.get("SKENER_NAZIV") or get(cfg, "identitet.naziv") or "")
+    kontakt = _ascii(os.environ.get("SKENER_KONTAKT") or get(cfg, "identitet.kontakt") or "")
+    if not naziv or not kontakt:
+        raise ConfigError(
+            "[identitet] naziv i kontakt nisu postavljeni. Administrator sajta mora da zna ko ga "
+            "skenira i kako da ga kontaktira: upiši ih u svoj --config fajl ili postavi "
+            "SKENER_NAZIV i SKENER_KONTAKT."
+        )
+    return get(cfg, "http.user_agent").format(verzija=__version__, naziv=naziv, kontakt=kontakt)
 
 
 def multiplier(cfg: dict[str, Any], industry: str, category: str) -> float:

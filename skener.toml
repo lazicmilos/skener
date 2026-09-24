@@ -2,6 +2,13 @@
 # Ovaj fajl je i podrazumevana konfiguracija: `--config` se spaja preko njega,
 # pa parcijalna korisnička konfiguracija ne gubi ostale pragove.
 
+[identitet]
+# Ko skenira. Ovo vidi svaki administrator u logu svog servera, pa mora da bude
+# operater — onaj ko pokreće alat — a ne autor alata. Bez oba polja alat odbija da
+# skenira. Upiši ih u svoj --config fajl ili postavi SKENER_NAZIV i SKENER_KONTAKT.
+naziv = ""                      # npr. "Web studio Primer"
+kontakt = ""                    # mejl ili adresa sajta na kojoj te administrator nalazi
+
 [http]
 concurrency = 8                 # globalni semafor (§8.1)
 per_host_concurrency = 1        # nikad dva paralelna zahteva ka istom sajtu (§8.1)
@@ -14,7 +21,7 @@ timeout_total_s = 20
 max_requests_per_domain = 16    # tvrd budžet (§4.2)
 max_seconds_per_domain = 25     # tvrd budžet (§4.2)
 max_crawl_delay_s = 10          # Crawl-delay se poštuje do ove granice (§8.3)
-user_agent = "MlazicSiteScanner/1.0 (+https://github.com/lazicmilos/skener; miloslazic458@gmail.com)"
+user_agent = "MlazicSiteScanner/{verzija} (+{kontakt}; {naziv})"   # popunjava se iz [identitet]
 
 [sitemap]
 max_depth = 3

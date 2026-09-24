@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from skener import __version__, store
-from skener.config import get
+from skener.config import get, user_agent
 from skener.models import (
     BrowserSnapshot,
     ConsoleStats,
@@ -237,7 +237,7 @@ async def capture(
             "height": get(config, "browser.viewport_height"),
         },
         device_scale_factor=1,
-        user_agent=get(config, "http.user_agent"),
+        user_agent=user_agent(config),
         ignore_https_errors=True,  # nevalidan sertifikat je nalaz nivoa 1, ne razlog da nivo 2 stane
     )
     try:

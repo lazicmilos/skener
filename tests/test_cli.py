@@ -233,3 +233,15 @@ def test_explain_all_markdown_pokriva_sve_provere(capsys):
     registry.load_all()
     for check_id in registry.REGISTRY:
         assert f"`{check_id}`" in ispis, f"{check_id} fali u tabeli za README"
+
+
+def test_scan_bez_identiteta_odbija_pre_ijednog_zahteva(tmp_path, monkeypatch):
+    """Bez imena i kontakta operatera nema skeniranja — ni jednog zahteva."""
+    monkeypatch.delenv("SKENER_NAZIV", raising=False)
+    monkeypatch.delenv("SKENER_KONTAKT", raising=False)
+    with FakeSite() as site:
+        domains = tmp_path / "d.csv"
+        domains.write_text(f"domain,industry\n{site.base_url},ostalo\n", encoding="utf-8")
+        with pytest.raises(SystemExit, match="identitet"):
+            cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), "--level", "1"])
+        assert site.requests == [], f"zahtevi pre provere identiteta: {site.requests}"

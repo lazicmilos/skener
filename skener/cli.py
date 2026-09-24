@@ -14,7 +14,7 @@ from pathlib import Path
 
 from skener import __version__, store
 from skener.checks import registry
-from skener.config import ConfigError, load_config
+from skener.config import ConfigError, load_config, user_agent
 from skener.models import INDUSTRIES, DomainInput, SiteSnapshot
 from skener.report import csv_out, html_out
 from skener.score import analyze, escalation_reasons, rank, select_for_level2
@@ -115,6 +115,7 @@ def cmd_scan(args: argparse.Namespace) -> int:
         config["http"]["domain_concurrency"] = args.concurrency
     if args.max_level2 is not None:
         config["escalation"]["max_level2"] = args.max_level2
+    user_agent(config)  # bez identiteta operatera nema ni jednog zahteva
 
     targets = read_domains(Path(args.domains), args.only)
     snapshots_dir = Path(args.snapshots or Path(args.out) / "snapshots")
@@ -218,6 +219,7 @@ def cmd_record(args: argparse.Namespace) -> int:
     from skener.fetch.http import scan_domains
 
     config = load_config(args.config)
+    user_agent(config)  # bez identiteta operatera nema ni jednog zahteva
     targets = read_domains(Path(args.domains), args.only)
     out = Path(args.out)
     sites = asyncio.run(scan_domains(targets, config))

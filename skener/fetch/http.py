@@ -24,7 +24,7 @@ from pathlib import Path
 import httpx
 
 from skener import __version__, store
-from skener.config import get
+from skener.config import get, user_agent
 from skener.fetch import page as page_builder
 from skener.fetch import robots as robots_parser
 from skener.fetch import sitemap as sitemap_parser
@@ -161,7 +161,7 @@ class Fetcher:
         return httpx.AsyncClient(
             verify=verify,
             follow_redirects=True,
-            headers={"User-Agent": get(self.config, "http.user_agent")},
+            headers={"User-Agent": user_agent(self.config)},
             timeout=httpx.Timeout(
                 get(self.config, "http.timeout_total_s"),
                 connect=get(self.config, "http.timeout_connect_s"),

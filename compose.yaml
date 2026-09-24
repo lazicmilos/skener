@@ -9,5 +9,9 @@ services:
     # većini Linux-a; ako je tvoj drugačiji: `export SKENER_UID=$(id -u) SKENER_GID=$(id -g)`.
     # Docker Desktop (Mac, Windows) ionako mapira vlasništvo.
     user: "${SKENER_UID:-1000}:${SKENER_GID:-1000}"
+    # Ko skenira — vidi [identitet] u skener.toml. Bez ova dva alat odbija da skenira.
+    environment:
+      - SKENER_NAZIV
+      - SKENER_KONTAKT
     volumes:
       - ./rad:/rad      # ulaz (CSV) i izlaz (izveštaji, snapshoti); kod ostaje u slici

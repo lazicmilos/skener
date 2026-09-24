@@ -8,6 +8,9 @@ from skener.checks.registry import Context, check, finding, ok, unknown
 from skener.models import SiteSnapshot
 
 SIMILARITY_CHARS = 2000
+# Samo ovi statusi tvrde da nečega nema. 401, 403, 429 i 5xx znače da je pristup
+# odbijen ili da server ne radi: tada ne znamo, pa je rezultat `unknown` (BUG-003).
+NE_POSTOJI = frozenset({404, 410})
 
 
 @check(
@@ -17,10 +20,10 @@ SIMILARITY_CHARS = 2000
     base_severity="medium",
     requires=["sitemap"],
     description="Nema sitemap.xml, ili postoji ali je prazan.",
-    threshold="status ≠ 200, ili 200 sa 0 URL-ova",
+    threshold="status 404 ili 410, ili 200 sa 0 URL-ova; ostali statusi → unknown",
     message=(
-        "Sajt nema mapu stranica. Google mora sam da pogađa koje stranice postoje, pa nove i "
-        "dublje stranice ume da pronađe tek posle više nedelja — ili nikad."
+        "Sajt nema mapu stranica (sitemap). Google zato nove i dublje stranice pronalazi samo "
+        "preko linkova, sporije, a stranice do kojih ne vodi nijedan link može i da ne pronađe."
     ),
     tech="sitemap status={status}, urls={broj_urlova}",
 )
@@ -28,6 +31,11 @@ def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     info = snapshot.sitemap
     if info.status == 200 and info.urls:
         return ok(sitemap_missing.spec)
+    if info.status != 200 and info.status not in NE_POSTOJI:
+        return unknown(
+            sitemap_missing.spec,
+            f"server je na sitemap odgovorio statusom {info.status}; iz toga se ne vidi da li postoji",
+        )
     return finding(
         sitemap_missing.spec,
         ctx,
@@ -43,7 +51,7 @@ def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     base_severity="low",
     requires=["robots"],
     description="Nema robots.txt.",
-    threshold="status ≠ 200",
+    threshold="status 404 ili 410; ostali statusi osim 200 → unknown",
     message=(
         "Sajt nema robots.txt. Ništa se time ne lomi, ali je to fajl koji svaki pretraživač "
         "prvo traži, i njegov izostanak je znak da se sajt nije podešavao za pretragu."
@@ -51,8 +59,14 @@ def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     tech="robots.txt status={status}",
 )
 def robots_missing(snapshot: SiteSnapshot, ctx: Context):
-    if snapshot.robots.status == 200:
+    status = snapshot.robots.status
+    if status == 200:
         return ok(robots_missing.spec)
+    if status not in NE_POSTOJI:
+        return unknown(
+            robots_missing.spec,
+            f"server je na robots.txt odgovorio statusom {status}; iz toga se ne vidi da li postoji",
+        )
     return finding(
         robots_missing.spec,
         ctx,
@@ -67,11 +81,11 @@ def robots_missing(snapshot: SiteSnapshot, ctx: Context):
     base_severity="high",
     requires=["soft404"],
     description="Nepostojeća adresa vraća 200 umesto 404.",
-    threshold="obe sonde vraćaju konačni status 200 (§5.2)",
+    threshold="obe sonde vraćaju konačni status 200 (§5.2); status van {200, 404, 410} → unknown",
     message=(
         "Na nepostojeću adresu sajt vraća običnu stranicu umesto poruke o grešci — obe "
-        "proverene izmišljene adrese vratile su status {status}. Google zbog toga može da "
-        "indeksira neograničen broj praznih adresa."
+        "proverene izmišljene adrese vratile su status {status}. Pretraživači zato teže "
+        "razlikuju prave stranice od nepostojećih i troše obilazak sajta na prazne adrese."
     ),
     tech="obe sonde status={status}, sličnost sa početnom {slicnost}",
 )
@@ -79,6 +93,13 @@ def soft404(snapshot: SiteSnapshot, ctx: Context):
     probes = snapshot.soft404.probes
     statuses = [p.status for p in probes]
     if not all(s == 200 for s in statuses):
+        odbijene = [s for s in statuses if s != 200 and s not in NE_POSTOJI]
+        if odbijene:
+            return unknown(
+                soft404.spec,
+                f"sonde su dobile status {', '.join(map(str, odbijene))}; iz toga se ne vidi "
+                "kako sajt odgovara na nepostojeću adresu",
+            )
         # Jedna sonda 200 a druga 404 → `ok`, ne nalaz (§5.2).
         return ok(soft404.spec)
 
@@ -124,6 +145,14 @@ def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
             return unknown(
                 tls_invalid.spec,
                 f"veza nije uspostavljena ({entry.error_kind or 'nepoznato'}), sertifikat nije proveren",
+            )
+        # Https nije uspeo, pa je sajt dohvaćen preko http-a: sertifikat nije ni viđen (BUG-004).
+        https = next((e for e in snapshot.errors if e.stage == "entry"), None)
+        if https is not None and entry.requested_url.startswith("http://"):
+            return unknown(
+                tls_invalid.spec,
+                f"https nije uspeo ({https.kind}: {https.detail[:120]}); sajt je dohvaćen preko "
+                "http-a, sertifikat nije proveren",
             )
         return ok(tls_invalid.spec)
     return finding(

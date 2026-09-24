@@ -500,3 +500,155 @@ def test_velika_mapa_sajta_ne_pojede_sonde_za_lazni_404():
     assert run_level(1, snapshot)["infra.soft404"].status == "ok"
     assert len(snapshot.pages) >= 6, "uzorak mora i dalje da bude upotrebljiv"
     assert not snapshot.budget.exhausted, snapshot.budget.aborted_reason
+
+
+# --------------------------------------------------------------------------- #
+# BUG-004: prekinuto TLS rukovanje nije nevalidan sertifikat
+# --------------------------------------------------------------------------- #
+def test_prekinuto_rukovanje_se_ne_klasifikuje_kao_sertifikat():
+    import ssl
+
+    try:
+        try:
+            raise ssl.SSLEOFError(8, "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred")
+        except ssl.SSLEOFError as cause:
+            raise httpx.ConnectError("greška", request=None) from cause
+    except httpx.ConnectError as exc:
+        assert _classify(exc)[0] == "tls_handshake"
+
+
+class PrekinutoRukovanje(Fetcher):
+    """Snimljeno: server prekida rukovanje sa Python klijentom, a preko http-a radi."""
+
+    async def _send(self, url: str, *, verify: bool) -> Outcome:
+        if url.startswith("https://"):
+            return Outcome(
+                url=url, error_kind="tls_handshake", error_detail="[SSL: UNEXPECTED_EOF_WHILE_READING]"
+            )
+        if url.endswith("/"):
+            return Outcome(url=url, status=200, final_url=url, redirect_chain=[url], body=html("Početna"))
+        return Outcome(url=url, status=404, final_url=url, redirect_chain=[url], body=b"")
+
+
+def test_prekinuto_rukovanje_pada_na_http_a_sertifikat_ostaje_neproveren():
+    cfg = load_config()
+    cfg["http"]["delay_ms"] = [0, 0]
+
+    async def run():
+        async with PrekinutoRukovanje(cfg) as fetcher:
+            return await fetch_site(fetcher, DomainInput(domain="rukovanje.test"))
+
+    snapshot = asyncio.run(run())
+    assert snapshot.entry.status == 200, "sajt koji radi preko http-a mora biti skeniran"
+    assert snapshot.entry.requested_url == "http://rukovanje.test/"
+    tls = run_level(1, snapshot)["infra.tls.invalid"]
+    assert tls.status == "unknown", "sertifikat nije ni proveren — ni nalaz ni `ok`"
+
+
+# --------------------------------------------------------------------------- #
+# BUG-003 kroz ceo lanac: sajt iza zaštite od botova
+# --------------------------------------------------------------------------- #
+IZAZOV = (
+    b"<!DOCTYPE html><html lang='en'><head><title>Checking your browser before accessing. "
+    b"Just a moment...</title></head><body></body></html>"
+)
+
+
+class BlokiranSajt(FakeSite):
+    """Svaki zahtev dobija 403 i stranu sa izazovom, kao dva sajta iz prolaza nad 100 domena."""
+
+    def route(self, path: str) -> Response:
+        return Response(IZAZOV, status=403)
+
+
+def test_blokiran_sajt_nema_nijedan_nalaz():
+    with BlokiranSajt() as site:
+        snapshot = scan(site)
+    nalazi = {cid for cid, r in run_level(1, snapshot).items() if r.status == "finding"}
+    assert nalazi == set(), f"ne znamo ništa o sajtu, a prijavljeno je: {sorted(nalazi)}"
+
+
+# --------------------------------------------------------------------------- #
+# Prelazi stanja ulaznog zahteva: https → (sertifikat → ponovo bez provere) |
+# (rukovanje, veza, istek → http) | (DNS → kraj). Za svaki prelaz: koji zahtevi su
+# poslati, šta je u snapshotu i šta kaže provera sertifikata.
+# --------------------------------------------------------------------------- #
+OK = "ok"
+ISHODI = {
+    OK: None,
+    "sertifikat": ("tls", "certificate has expired"),
+    "rukovanje": ("tls_handshake", "UNEXPECTED_EOF_WHILE_READING"),
+    "veza": ("connection", "ConnectError: odbijeno"),
+    "istek": ("connect_timeout", "ConnectTimeout"),
+    "dns": ("dns", "Name or service not known"),
+}
+
+
+class TabelaIshoda(Fetcher):
+    """Odgovara prema tabeli: (šema, sa proverom sertifikata) → ishod."""
+
+    def __init__(self, cfg, tabela):
+        super().__init__(cfg)
+        self.tabela = tabela
+        self.poslato: list[tuple[str, bool]] = []
+
+    async def _send(self, url: str, *, verify: bool) -> Outcome:
+        sema = url.split("://")[0]
+        self.poslato.append((sema, verify))
+        if not url.endswith("/") or url.count("/") > 3:
+            return Outcome(url=url, status=404, final_url=url, redirect_chain=[url], body=b"")
+        greska = ISHODI[self.tabela.get((sema, verify), "veza")]
+        if greska:
+            return Outcome(url=url, error_kind=greska[0], error_detail=greska[1])
+        return Outcome(url=url, status=200, final_url=url, redirect_chain=[url], body=html("Početna"))
+
+
+@pytest.mark.parametrize(
+    "tabela, ulaz, sertifikat, prvi_zahtevi",
+    [
+        pytest.param({("https", True): OK}, "https", "ok", [("https", True)], id="st-https-uspeo"),
+        pytest.param(
+            {("https", True): "sertifikat", ("https", False): OK},
+            "https", "finding", [("https", True), ("https", False)], id="st-sertifikat-pa-bez-provere",
+        ),
+        pytest.param(
+            {("https", True): "sertifikat", ("https", False): "veza"},
+            None, "finding", [("https", True), ("https", False)], id="st-sertifikat-pa-nista",
+        ),
+        pytest.param(
+            {("https", True): "rukovanje", ("http", True): OK},
+            "http", "unknown", [("https", True), ("http", True)], id="st-rukovanje-pa-http",
+        ),
+        pytest.param(
+            {("https", True): "veza", ("http", True): OK},
+            "http", "unknown", [("https", True), ("https", True), ("http", True)], id="st-veza-pa-http",
+        ),
+        pytest.param(
+            {("https", True): "istek", ("http", True): "istek"},
+            None, "unknown", [("https", True), ("https", True), ("http", True), ("http", True)],
+            id="st-istek-pa-istek",
+        ),
+        pytest.param({("https", True): "dns"}, None, "unknown", [("https", True)], id="st-dns-kraj"),
+    ],
+)
+def test_prelazi_stanja_ulaznog_zahteva(monkeypatch, tabela, ulaz, sertifikat, prvi_zahtevi):
+    monkeypatch.setattr("skener.fetch.http.random.uniform", lambda *_: 0)  # bez pauze pred ponovni pokušaj
+    cfg = load_config()
+    cfg["http"]["delay_ms"] = [0, 0]
+    fetcher = TabelaIshoda(cfg, tabela)
+
+    async def run():
+        async with fetcher:
+            return await fetch_site(fetcher, DomainInput(domain="stanja.test"))
+
+    snapshot = asyncio.run(run())
+    assert fetcher.poslato[: len(prvi_zahtevi)] == prvi_zahtevi
+    if ulaz is None:
+        assert snapshot.entry.status is None
+    else:
+        assert snapshot.entry.status == 200 and snapshot.entry.requested_url.startswith(f"{ulaz}://")
+    rezultati = run_level(1, snapshot)
+    assert rezultati["infra.tls.invalid"].status == sertifikat
+    if tabela.get(("https", True)) == "dns":
+        assert len(fetcher.poslato) == 1, "posle DNS greške nema drugih zahteva"
+        assert rezultati["infra.dns.unresolved"].status == "finding"

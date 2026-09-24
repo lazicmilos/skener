@@ -247,3 +247,108 @@ def test_kompresija_se_ne_prijavljuje_za_mali_html():
     site.home.headers = {}
     site.home.html_bytes = 20_000
     assert run_level(1, site)["perf.compression.missing"].status == "ok"
+
+
+# --------------------------------------------------------------------------- #
+# BUG-003: status ≠ 200 nije isto što i „ne postoji". Samo 404 i 410 to tvrde;
+# 401/403/429/5xx znače da je pristup odbijen, pa ne znamo. Klase ekvivalencije
+# statusa: postoji / ne postoji / ne zna se.
+# --------------------------------------------------------------------------- #
+POSTOJI, NE_POSTOJI, NE_ZNA_SE = "ok", "finding", "unknown"
+
+STATUSI_FAJLA = [
+    pytest.param(200, POSTOJI, id="ke-postoji-200"),
+    pytest.param(404, NE_POSTOJI, id="ke-ne-postoji-404"),
+    pytest.param(410, NE_POSTOJI, id="ke-ne-postoji-410"),
+    pytest.param(401, NE_ZNA_SE, id="ke-odbijeno-401"),
+    pytest.param(403, NE_ZNA_SE, id="ke-odbijeno-403"),
+    pytest.param(429, NE_ZNA_SE, id="ke-odbijeno-429"),
+    pytest.param(500, NE_ZNA_SE, id="ke-greska-servera-500"),
+    pytest.param(503, NE_ZNA_SE, id="ke-greska-servera-503"),
+]
+
+
+@pytest.mark.parametrize("status, ocekivano", STATUSI_FAJLA)
+def test_robots_status_odredjuje_ishod(status, ocekivano):
+    site = clean_site()
+    site.robots.status = status
+    rezultat = run_level(1, site)["infra.robots.missing"]
+    assert rezultat.status == ocekivano
+    if ocekivano == NE_ZNA_SE:
+        assert str(status) in rezultat.reason
+
+
+@pytest.mark.parametrize("status, ocekivano", STATUSI_FAJLA)
+def test_sitemap_status_odredjuje_ishod(status, ocekivano):
+    site = clean_site()
+    site.sitemap.status = status
+    if status != 200:
+        site.sitemap.urls.clear()
+    rezultat = run_level(1, site)["infra.sitemap.missing"]
+    assert rezultat.status == ocekivano
+    if ocekivano == NE_ZNA_SE:
+        assert str(status) in rezultat.reason
+
+
+def test_sitemap_200_bez_ijednog_url_a_je_nalaz():
+    """Granična vrednost: fajl postoji, ali je prazan."""
+    site = clean_site()
+    site.sitemap.urls.clear()
+    assert run_level(1, site)["infra.sitemap.missing"].status == NE_POSTOJI
+
+
+def _sonde(domain: str, prva: int, druga: int) -> Soft404:
+    return Soft404(
+        probes=[
+            Soft404Probe(url=f"https://{domain}/abc123", status=prva),
+            Soft404Probe(url=f"https://{domain}/abc123.html", status=druga),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "prva, druga, ocekivano",
+    [
+        pytest.param(200, 200, NE_POSTOJI, id="tab-obe-200"),
+        pytest.param(404, 404, POSTOJI, id="tab-obe-404"),
+        pytest.param(410, 404, POSTOJI, id="tab-410-i-404"),
+        pytest.param(200, 404, POSTOJI, id="tab-200-i-404"),
+        pytest.param(403, 403, NE_ZNA_SE, id="tab-obe-odbijene"),
+        pytest.param(200, 403, NE_ZNA_SE, id="tab-200-i-odbijena"),
+        pytest.param(404, 503, NE_ZNA_SE, id="tab-404-i-greska"),
+        pytest.param(429, 429, NE_ZNA_SE, id="tab-obe-429"),
+    ],
+)
+def test_soft404_tabela_odlucivanja(prva, druga, ocekivano):
+    """Tabela odlučivanja nad statusima dve sonde (§5.2); `NE_POSTOJI` ovde znači nalaz."""
+    site = clean_site()
+    site.soft404 = _sonde(site.domain, prva, druga)
+    assert run_level(1, site)["infra.soft404"].status == ocekivano
+
+
+def test_blokiran_sajt_ne_dobija_nalaze_iz_odbijenih_zahteva():
+    """BUG-003, snimljeno: ceo sajt vraća 403 „Checking your browser before accessing"."""
+    site = clean_site()
+    site.robots.status = 403
+    site.sitemap.status = 403
+    site.sitemap.urls.clear()
+    site.soft404 = _sonde(site.domain, 403, 403)
+    rezultati = run_level(1, site)
+    for check_id in ("infra.robots.missing", "infra.sitemap.missing", "infra.soft404"):
+        assert rezultati[check_id].status == NE_ZNA_SE, check_id
+        assert "403" in rezultati[check_id].reason
+
+
+# --------------------------------------------------------------------------- #
+# BUG-004: sajt dohvaćen preko http-a posle neuspelog https-a — sertifikat
+# nije proveren, pa „ok" ne sme da stoji
+# --------------------------------------------------------------------------- #
+def test_tls_je_unknown_kad_je_https_pao_a_sajt_dohvacen_preko_http():
+    from skener.models import SnapshotError
+
+    site = clean_site()
+    site.entry.requested_url = "http://cist.rs/"
+    site.errors.append(SnapshotError("entry", "tls_handshake", "UNEXPECTED_EOF_WHILE_READING"))
+    rezultat = run_level(1, site)["infra.tls.invalid"]
+    assert rezultat.status == "unknown"
+    assert "UNEXPECTED_EOF_WHILE_READING" in rezultat.reason

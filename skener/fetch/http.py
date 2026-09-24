@@ -120,7 +120,10 @@ def _classify(exc: Exception) -> tuple[str, str]:
         if isinstance(link, ssl.SSLCertVerificationError):
             return "tls", str(link)
         if isinstance(link, ssl.SSLError):
-            return "tls", str(link)
+            # Prekinuto rukovanje nije dokaz o sertifikatu (BUG-004): server ume da prekine
+            # vezu sa Python klijentom, a browseru pokaže ispravan sertifikat. Zato ide
+            # kroz običan pad na http, bez nalaza o sertifikatu.
+            return "tls_handshake", str(link)
     if isinstance(exc, httpx.ConnectTimeout):
         return "connect_timeout", str(exc)
     if isinstance(exc, httpx.ReadTimeout):

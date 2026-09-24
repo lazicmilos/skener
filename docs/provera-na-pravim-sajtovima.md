@@ -12,12 +12,16 @@ Sve ide kroz Docker: ista slika, ista verzija Chromium-a i Python-a kao u CI-ju.
 tvoj rezultat razlikuje od mog, razlika je u mreži i sajtovima, ne u okruženju.
 
 ```bash
-git pull origin claude/quirky-wozniak-u6p6xn
+git pull
 mkdir -p rad                                    # ulaz i izlaz; kod ostaje u slici
+export SKENER_NAZIV="Ime operatera" SKENER_KONTAKT="kontakt@primer.rs"  # ko skenira; bez ovoga nema zahteva
 export SKENER_UID=$(id -u) SKENER_GID=$(id -g)  # Linux: da izveštaji pripadaju tebi
 docker compose build
-docker compose run --rm skener pytest -q        # mora biti 327 passed pre ičega drugog
+docker compose run --rm skener pytest -q        # svi testovi moraju da prođu pre ičega drugog
 ```
+
+U PowerShell-u se identitet postavlja sa `$env:SKENER_NAZIV = "Ime operatera"` i
+`$env:SKENER_KONTAKT = "kontakt@primer.rs"`, a `SKENER_UID` ti na Windows-u ne treba.
 
 Ako ijedan test preskoči sa „Chromium se ne pokreće", slika nije dobra i dalje se ne ide.
 

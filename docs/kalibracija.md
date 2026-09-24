@@ -3,6 +3,29 @@
 Dnevnik odluka iz provera na pravim sajtovima. Oblik: **zapažanje — uzrok — odluka**.
 Kako se provera radi, piše u [`provera-na-pravim-sajtovima.md`](provera-na-pravim-sajtovima.md).
 
+## 2026-09-24 — treći prolaz: težina iz prenetih bajtova
+
+Ceo izveštaj: [`izvestaj-testiranja-2.md`](izvestaj-testiranja-2.md).
+
+| Prag ili pravilo | Zapažanje | Odluka |
+|---|---|---|
+| šta se broji u težini | brojač je sabirao raspakovano telo; isti sajt: 25,3 MB raspakovano, 3,8 MB preneto (BUG-016) | broje se preneti bajtovi (`responseBodySize`) |
+| `perf.page.weight` | preneto bez videa, 60 sajtova: medijana 2,8 MB, p75 5,2, p90 8,1, najviše 22,1 | 3 / 5 / 8 MB; zamenjuje 5 / 10 / 20 MB iz reda ispod |
+| ispravka primera za video | „8,5 MB jednom, 26,9 MB drugi put" nije bio video: taj sajt nema nijedan video bajt, razliku prave skripte i stilovi koji se učitavaju i posle `load` | odluka o videu ostaje; pravi primer je sajt koji je u jednom prolazu preneo 77 MB videa, a u drugom 39 MB |
+
+## 2026-09-24 — odluke posle prolaza nad 100 domena
+
+| Prag ili pravilo | Zapažanje | Odluka |
+|---|---|---|
+| `perf.page.weight` | 55 od 60 sajtova preko 1,5 MB; medijana 4,4 MB, p75 10,6, p90 17,2 (raspakovani bajtovi) | 5 / 10 / 20 MB, bez videa (zamenjeno, vidi gore) |
+| video u težini | isti sajt: 8,5 MB jednom, 26,9 MB drugi put (pogrešan primer, vidi ispravku gore) | ne ulazi u prag; u rečenici stoji posebno |
+| vreme učitavanja | u prolazu do 4,6× duže nego kad se sajt meri sam | učitava se jedan po jedan; ostatak merenja paralelno |
+| `http.max_seconds_per_domain` | 19 domena potrošilo 25 s; strana na sporom hostingu 1–3 s | 40 s; broj zahteva ostaje 16 |
+| izbor za nivo 2 | 9 od 18 odsečenih kandidata bez ijednog nalaza nivoa 1 | prvo kandidati bez jakog nalaza nivoa 1 |
+| `i18n.lang.mismatch` | tačan 28 od 28, ali poruka je tvrdila nešto o Google-u što nije tačno | poruka o čitačima ekrana; high → medium |
+| `perf.compression.missing` | poruka je tvrdila „sekunda i po"; stvarna ušteda je desetinke sekunde | ušteda se računa iz veličine; medium → low |
+| statusi 401/403/429/5xx | sajt iza zaštite od botova dobijao nalaze o robots.txt i mapi sajta | samo 404 i 410 znače „ne postoji"; ostalo je `unknown` |
+
 ## 2026-09-24 — prolaz nad 100 pravih domena
 
 Ceo izveštaj: [`izvestaj-testiranja-100.md`](izvestaj-testiranja-100.md). Ukratko: 0 padova i 7,7 min

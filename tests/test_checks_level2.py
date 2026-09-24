@@ -22,7 +22,7 @@ def test_pokrivene_su_sve_registrovane_provere():
 
 
 POZITIVNI = {
-    "perf.page.weight": lambda b: setattr(b.network, "total_bytes", 9_000_000),
+    "perf.page.weight": lambda b: setattr(b.network, "total_bytes", 25_000_000),
     "perf.request.count": lambda b: setattr(b.network, "request_count", 175),
     "perf.load.time": lambda b: setattr(b.timing, "load_ms", 9_000),
     "seo.h1.missing": lambda b: setattr(b.dom, "h1_count", 0),
@@ -65,7 +65,22 @@ def test_pozitivan_nalaz(check_id):
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "total_bytes, expected",
-    [(1_000_000, None), (2_000_000, "medium"), (4_000_000, "high"), (9_000_000, "critical")],
+    [
+        # Granične vrednosti (trotačkasto) za pragove kalibrisane nad 60 pravih sajtova:
+        # medijana 2,8 MB, p75 5,2 MB, p90 8,1 MB prenetih bajtova bez videa
+        # (docs/izvestaj-testiranja-2.md).
+        pytest.param(1_000_000, None, id="ke-lagana"),
+        pytest.param(2_999_999, None, id="gv-3MB-minus"),
+        pytest.param(3_000_000, None, id="gv-3MB"),
+        pytest.param(3_000_001, "medium", id="gv-3MB-plus"),
+        pytest.param(4_999_999, "medium", id="gv-5MB-minus"),
+        pytest.param(5_000_000, "medium", id="gv-5MB"),
+        pytest.param(5_000_001, "high", id="gv-5MB-plus"),
+        pytest.param(7_999_999, "high", id="gv-8MB-minus"),
+        pytest.param(8_000_000, "high", id="gv-8MB"),
+        pytest.param(8_000_001, "critical", id="gv-8MB-plus"),
+        pytest.param(22_100_000, "critical", id="ke-najteza-izmerena"),
+    ],
 )
 def test_tezina_stranice_stepenasto(total_bytes, expected):
     browser = clean_browser()
@@ -209,3 +224,25 @@ def test_veliki_visak_bajtova_pali_nalaz_i_ispod_tri_slike():
         )
     ]
     assert run_level(2, browser)["perf.img.oversized"].status == "finding"
+
+
+# --------------------------------------------------------------------------- #
+# O-2: video se ne računa u prag težine — skida se koliko vreme merenja dozvoli
+# --------------------------------------------------------------------------- #
+def test_video_se_ne_racuna_u_prag_tezine():
+    """Isti sajt je u jednom prolazu preneo 77 MB videa, a u drugom 39 MB."""
+    browser = clean_browser()
+    browser.network.total_bytes = 24_500_000
+    browser.network.bytes_by_type = {"media": 22_000_000, "image": 2_000_000, "script": 500_000}
+    assert run_level(2, browser)["perf.page.weight"].status == "ok"
+
+
+def test_nalaz_tezine_pominje_video_posebno():
+    browser = clean_browser()
+    browser.network.total_bytes = 30_000_000
+    browser.network.bytes_by_type = {"media": 8_000_000, "image": 21_000_000, "script": 1_000_000}
+    nalaz = run_level(2, browser)["perf.page.weight"].findings[0]
+    assert nalaz.severity == "critical", "22 MB bez videa je iznad 8 MB"
+    assert nalaz.evidence["mb"] == 22.0
+    assert nalaz.evidence["video_mb"] == 8.0
+    assert "video" in nalaz.message_client

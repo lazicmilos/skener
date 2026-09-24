@@ -60,10 +60,23 @@ OCEKIVANO = {
 }
 
 
+def spec_config() -> dict:
+    """Pragovi težine iz specifikacije (§7.3), ne kalibrisani.
+
+    Ovaj skup proverava da lanac snapshot → provere → bodovi → rangiranje radi nad
+    stanjem koje §12.4 opisuje. Kalibracija pragova nad pravim sajtovima ima svoje
+    testove graničnih vrednosti; da ovde važe kalibrisani pragovi, svaka kalibracija
+    bi „pokvarila" specifikaciju.
+    """
+    config = load_config()
+    config["thresholds"]["perf"]["page_weight_mb"] = {"medium": 1.5, "high": 3.0, "critical": 8.0}
+    return config
+
+
 @pytest.fixture(scope="module")
 def izvestaji():
     registry.load_all()
-    config = load_config()
+    config = spec_config()
     reports = {}
     for site, browser in store.read_all(FIXTURES):
         ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)

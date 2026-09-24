@@ -136,7 +136,7 @@ def html_size(snapshot: SiteSnapshot, ctx: Context):
     base_severity="critical",
     requires=["network"],
     description="Ukupna težina početne strane.",
-    threshold="> 1,5 MB medium · > 3 MB high · > 8 MB critical",
+    threshold="preneto, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical",
     message=(
         "Početna strana prenosi {mb} MB{uz_video}. Na sporijoj mobilnoj vezi ({brzina} Mb/s) za "
         "to je potrebno oko {sekundi} s, a mnogi posetioci ne čekaju toliko."

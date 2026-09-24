@@ -28,7 +28,8 @@ jobs:
         run: playwright install --with-deps chromium
 
       - name: Testovi
-        run: pytest -q
+        # Izlazni kriterijum iz plana testiranja: pokrivenost linija i grana ne pada ispod 92 %.
+        run: pytest -q --cov=skener --cov-branch --cov-report=term --cov-fail-under=92
 
       - name: Tabela provera se ne razilazi sa README-om
         run: |

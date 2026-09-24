@@ -220,6 +220,12 @@ def test_explain_ispisuje_prag_i_recenicu(capsys):
     assert "rečenica za klijenta" in ispis
 
 
+def test_explain_ispisuje_opis_provere(capsys):
+    # mutacija `description=None` u registru je preživela: opis se ispisivao, a niko ga nije proveravao
+    assert cli.main(["explain", "seo.canonical.duplicate"]) == 0
+    assert "prijavljuje isti canonical" in capsys.readouterr().out
+
+
 def test_explain_nepoznate_provere_predlaze_slicne():
     with pytest.raises(SystemExit, match="canonical"):
         cli.main(["explain", "canonical"])
@@ -313,6 +319,116 @@ def test_nevazeci_brojevi_na_komandnoj_liniji_se_odbijaju(tmp_path, argumenti):
     with pytest.raises(SystemExit) as izlaz:
         cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), *argumenti])
     assert izlaz.value.code == 2, "argparse odbija pre ijednog zahteva"
+
+
+# --------------------------------------------------------------------------- #
+# Tok nivoa 2 kroz CLI — pokrivenost je pokazala da ga nijedan test ne pokreće,
+# a koristi ga svaki pravi prolaz.
+# --------------------------------------------------------------------------- #
+BEZ_H1 = (
+    "<!doctype html><html lang='sr'><head><title>Bez naslova</title>"
+    "<link rel='canonical' href='/'><meta name='description' content='Opis.'>"
+    "<meta property='og:title' content='a'><meta property='og:description' content='b'>"
+    "<meta property='og:image' content='/c.jpg'></head><body><p>"
+    + "Sadržaj sa dijakriticima čćšžđ. " * 60
+    + "</p></body></html>"
+).encode()
+
+
+# Početna sa dovoljno teksta: lažni sajt inače ima ~550 znakova, ispod praga od 800
+# za „prazan HTML", pa je i on legitimno kandidat za nivo 2.
+BOGATA_POCETNA = html(
+    "Početna",
+    head=(
+        "<link rel='canonical' href='/'><meta name='description' content='Opis.'>"
+        "<meta property='og:title' content='a'><meta property='og:description' content='b'>"
+        "<meta property='og:image' content='/c.jpg'>"
+    ),
+    body="<p>" + "Dodatni tekst o uslugama i cenama. " * 30 + "</p>",
+)
+
+
+@pytest.mark.browser
+def test_scan_auto_salje_na_nivo_2_samo_kandidate(tmp_path):
+    config = tmp_path / "brzo.toml"
+    config.write_text("[http]\ndelay_ms = [0, 0]\n", encoding="utf-8")
+    with FakeSite(extra={"/": Response(BOGATA_POCETNA)}) as cist, FakeSite(
+        extra={"/": Response(BEZ_H1)}
+    ) as bez_h1:
+        domains = tmp_path / "d.csv"
+        domains.write_text(
+            f"domain,industry\n{cist.base_url},ostalo\n{bez_h1.base_url},ostalo\n", encoding="utf-8"
+        )
+        out = tmp_path / "izvestaj"
+        assert cli.main(["scan", str(domains), "--out", str(out), "--config", str(config)]) == 0
+
+    redovi = {r["domain"]: r for r in csv.DictReader((out / "summary.csv").open(encoding="utf-8"))}
+    assert redovi[bez_h1.base_url]["level2_ran"] == "1", "sirovi HTML bez h1 mora na nivo 2"
+    assert redovi[cist.base_url]["level2_ran"] == "0", "čist i brz sajt ne ide na nivo 2"
+    nalazi = [r for r in csv.DictReader((out / "findings.csv").open(encoding="utf-8"))]
+    assert any(r["domain"] == bez_h1.base_url and r["check_id"] == "seo.h1.missing" for r in nalazi)
+    assert list((out / "snapshots").glob("*/browser.json")), "snapshot nivoa 2 mora na disk"
+
+
+@pytest.mark.browser
+def test_record_nivo_2_snima_i_browser_snapshot(tmp_path):
+    config = tmp_path / "brzo.toml"
+    config.write_text("[http]\ndelay_ms = [0, 0]\n", encoding="utf-8")
+    with FakeSite() as site:
+        domains = tmp_path / "d.csv"
+        domains.write_text(f"domain,industry\n{site.base_url},ostalo\n", encoding="utf-8")
+        out = tmp_path / "fixtures"
+        argumenti = ["record", str(domains), "--out", str(out), "--level", "2", "--config", str(config)]
+        assert cli.main(argumenti) == 0
+    assert list(out.glob("*/browser.json.gz")) and list(out.glob("*/site.json.gz"))
+
+
+# --------------------------------------------------------------------------- #
+# Greške komandi i logovanje
+# --------------------------------------------------------------------------- #
+def test_recheck_bez_snapshota_puca_razumljivo(tmp_path):
+    with pytest.raises(SystemExit, match="nijedan snapshot"):
+        cli.main(["recheck", str(tmp_path), "--out", str(tmp_path / "izlaz")])
+
+
+def test_explain_bez_argumenata_puca(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["explain"])
+    assert "--all" in capsys.readouterr().err
+
+
+def test_prekid_sa_tastature_vraca_130(monkeypatch, tmp_path):
+    """Ctrl+C usred prolaza: uredan izlazni kod 130, ne traceback."""
+
+    def prekini(_args):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "cmd_recheck", prekini)  # parser se gradi pri svakom pozivu main()
+    assert cli.main(["recheck", str(tmp_path)]) == 130
+
+
+def test_greska_u_konfiguraciji_je_poruka_a_ne_traceback(tmp_path):
+    pokvaren = tmp_path / "pokvaren.toml"
+    pokvaren.write_text("[http\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="greška u konfiguraciji"):
+        cli.main(["recheck", str(tmp_path), "--config", str(pokvaren)])
+
+
+def test_debug_domain_propusta_samo_taj_domen():
+    import io
+    import logging
+
+    cli.setup_logging("mensa.rs")
+    tok = io.StringIO()
+    handler = logging.getLogger("skener").handlers[0]
+    handler.stream = tok
+    log = logging.getLogger("skener.test")
+    log.debug("ovaj se vidi", extra={"domain": "mensa.rs"})
+    log.debug("ovaj ne", extra={"domain": "angolo.rs"})
+    redovi = [json.loads(red) for red in tok.getvalue().splitlines()]
+    assert [r["message"] for r in redovi] == ["ovaj se vidi"]
+    assert redovi[0]["domain"] == "mensa.rs" and redovi[0]["level"] == "DEBUG"
+    cli.setup_logging(None)
 
 
 @pytest.mark.skipif(not hasattr(__import__("time"), "tzset"), reason="tzset postoji samo na Unix-u")

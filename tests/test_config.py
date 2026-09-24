@@ -163,6 +163,18 @@ def test_paralelizam_i_budzet_moraju_biti_pozitivni(tmp_path, kljuc, vrednost, i
             load_config(override)
 
 
+def test_neispravan_toml_puca_i_imenuje_fajl(tmp_path):
+    override = tmp_path / "pokvaren.toml"
+    override.write_text("[http\nconcurrency = 8\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="pokvaren.toml"):
+        load_config(override)
+
+
+def test_nepostojeci_config_fajl_puca(tmp_path):
+    with pytest.raises(ConfigError, match="ne postoji"):
+        load_config(tmp_path / "nema.toml")
+
+
 @pytest.mark.parametrize(
     "vrednost, ispravna",
     [
@@ -180,3 +192,28 @@ def test_vremenski_budzet_mora_biti_pozitivan(tmp_path, vrednost, ispravna):
     else:
         with pytest.raises(ConfigError, match="max_seconds_per_domain"):
             load_config(override)
+
+
+def test_konfiguracija_iz_radnog_direktorijuma_ima_prednost(tmp_path, monkeypatch):
+    import shutil
+
+    from skener.config import default_config_path
+
+    kopija = tmp_path / "skener.toml"
+    shutil.copy(default_config_path(), kopija)
+    monkeypatch.chdir(tmp_path)
+    assert default_config_path() == kopija
+
+
+def test_bez_podrazumevane_konfiguracije_puca_i_kaze_sta_da_se_uradi(monkeypatch):
+    monkeypatch.setattr("skener.config.CONFIG_NAME", "nepostojeci.toml")
+    with pytest.raises(ConfigError, match="--config"):
+        load_config()
+
+
+@pytest.mark.parametrize("sekcija", ["severity_points", "industry_multipliers"])
+def test_nedostaje_cela_sekcija(sekcija):
+    cfg = load_config()
+    del cfg[sekcija]
+    with pytest.raises(ConfigError, match=sekcija):
+        _validate(cfg)

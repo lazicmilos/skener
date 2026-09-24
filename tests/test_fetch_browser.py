@@ -350,3 +350,29 @@ def test_prekid_posle_tvrdog_limita_ne_ostavlja_gresku_u_logu(caplog):
     assert snimak.status == "failed"
     zaostale = [r.getMessage() for r in caplog.records if r.name == "asyncio"]
     assert not zaostale, zaostale
+
+
+def test_stranica_koja_se_ne_otvara_je_failed_sa_razlogom():
+    """Greška pri otvaranju koja nije istek (odbijena veza) → `failed`, ne pad."""
+    from skener.fetch.browser import capture_all
+
+    mrtav = SiteSnapshot(
+        domain="http://127.0.0.1:1",
+        pages=[PageSnapshot(url="http://127.0.0.1:1/", final_url="http://127.0.0.1:1/", status=200)],
+        entry=Entry(requested_url="http://127.0.0.1:1/", final_url="http://127.0.0.1:1/", status=200),
+    )
+    snimak = asyncio.run(capture_all([mrtav], load_config()))["http://127.0.0.1:1"]
+    assert snimak.status == "failed"
+    assert snimak.errors and snimak.errors[0].stage == "goto"
+
+
+def test_sistemski_chromium_iz_konfiguracije_i_okruzenja(monkeypatch):
+    from skener.fetch.browser import _launch_options
+
+    cfg = load_config()
+    monkeypatch.delenv("SKENER_CHROMIUM", raising=False)
+    assert _launch_options(cfg) == {}
+    monkeypatch.setenv("SKENER_CHROMIUM", "/usr/bin/chromium")
+    assert _launch_options(cfg) == {"executable_path": "/usr/bin/chromium"}
+    cfg["browser"]["executable_path"] = "/opt/chrome"
+    assert _launch_options(cfg) == {"executable_path": "/opt/chrome"}, "fajl ima prednost"

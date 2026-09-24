@@ -379,26 +379,33 @@ class SporSajt(FakeSite):
 
 
 def test_budzet_vremena_krece_tek_kad_domen_dobije_red():
-    """Budžet od 25 s je za rad na domenu, ne za čekanje u redu iza ostalih 199.
+    """Budžet od 40 s je za rad na domenu, ne za čekanje u redu iza ostalih 199.
 
-    Sa globalnim semaforom od 2 i deset domena, ukupan rad traje ~2× duže od
-    budžeta. Ako sat krene za sve odjednom, poslednji domeni ispadnu `partial`
-    a da nijedan zahtev nije bio spor.
+    Deset domena na dva mesta = pet krugova, pa je rad jednog domena oko petine
+    prolaza. Da sat kreće za sve odjednom, poslednji domeni bi imali potrošeno
+    skoro celo vreme prolaza. Poredi se odnos, ne apsolutno vreme, pa test ne zavisi
+    od brzine mašine.
     """
-    sajtovi = [SporSajt(delay=0.04) for _ in range(10)]
+    import time
+
+    sajtovi = [SporSajt(delay=0.05) for _ in range(10)]
     for sajt in sajtovi:
         sajt.__enter__()
     try:
         cfg = load_config()
-        cfg["http"].update(delay_ms=[0, 0], concurrency=2, domain_concurrency=2, max_seconds_per_domain=2)
+        cfg["http"].update(delay_ms=[0, 0], concurrency=2, domain_concurrency=2)
         targets = [DomainInput(domain=s.base_url) for s in sajtovi]
+        pocetak = time.monotonic()
         snapshots = asyncio.run(scan_domains(targets, cfg))
+        ukupno = time.monotonic() - pocetak
     finally:
         for sajt in sajtovi:
             sajt.__exit__()
 
-    potroseni = [s.domain for s in snapshots if s.budget.exhausted]
-    assert not potroseni, f"budžet potrošen na čekanje u redu: {potroseni}"
+    najduze = max(s.budget.elapsed_ms for s in snapshots) / 1000
+    assert najduze < ukupno * 0.6, (
+        f"domen je potrošio {najduze:.1f} s od {ukupno:.1f} s prolaza: sat je tekao dok je čekao red"
+    )
 
 
 def test_vreme_odgovora_ne_uključuje_pauzu_pristojnosti():
@@ -409,10 +416,11 @@ def test_vreme_odgovora_ne_uključuje_pauzu_pristojnosti():
     """
     with FakeSite() as site:
         # početna + robots + 2 mape + 2 sonde = 6; tek sedmi i osmi zahtev su uzorak
-        snapshot = scan(site, **{"http.delay_ms": [300, 300], "http.max_requests_per_domain": 8})
+        snapshot = scan(site, **{"http.delay_ms": [600, 600], "http.max_requests_per_domain": 8})
     uzorak = snapshot.pages[1:]
     assert uzorak, "uzorak mora da ima bar jednu stranicu"
-    assert all(p.elapsed_ms < 250 for p in uzorak), [p.elapsed_ms for p in uzorak]
+    # Pauza je 600 ms; lokalni odgovor traje desetak ms, a pod opterećenjem do ~300 ms.
+    assert all(p.elapsed_ms < 450 for p in uzorak), [p.elapsed_ms for p in uzorak]
 
 
 class IndexPhpSajt(FakeSite):
@@ -652,3 +660,68 @@ def test_prelazi_stanja_ulaznog_zahteva(monkeypatch, tabela, ulaz, sertifikat, p
     if tabela.get(("https", True)) == "dns":
         assert len(fetcher.poslato) == 1, "posle DNS greške nema drugih zahteva"
         assert rezultati["infra.dns.unresolved"].status == "finding"
+
+
+# --------------------------------------------------------------------------- #
+# Rupe iz merenja pokrivenosti
+# --------------------------------------------------------------------------- #
+def test_crawl_delay_iz_robots_a_se_postuje():
+    """§8.3: `Crawl-delay: 1` — između dva zahteva ka sajtu bar sekunda."""
+    import time
+
+    trenuci: list[float] = []
+
+    class Beleznica(FakeSite):
+        def route(self, path: str) -> Response:
+            trenuci.append(time.monotonic())
+            if path == "/robots.txt":
+                return Response(b"User-agent: *\nCrawl-delay: 1\n", headers={"content-type": "text/plain"})
+            return super().route(path)
+
+    with Beleznica() as site:
+        scan(site, **{"http.max_requests_per_domain": 5})
+    posle_robots = trenuci[1:]
+    razmaci = [b - a for a, b in zip(posle_robots, posle_robots[1:], strict=False)]
+    assert razmaci and min(razmaci) >= 0.9, f"razmaci: {[round(r, 2) for r in razmaci]}"
+
+
+def test_pokvarena_mapa_u_indeksu_pada_na_interne_linkove():
+    with FakeSite(extra={"/sitemap-1.xml": Response(b"nema", status=404)}) as site:
+        snapshot = scan(site)
+    assert snapshot.sitemap.status == 200, "indeks postoji"
+    assert snapshot.sample_source == "links"
+    assert any(p.url.endswith("/usluge") for p in snapshot.pages)
+
+
+def test_izuzetak_u_domenu_daje_red_a_ne_pad(monkeypatch):
+    """U2: izuzetak iz sklapanja snapshota ostaje u tom domenu."""
+    import skener.fetch.http as http
+
+    async def puca(_fetcher, _target):
+        raise RuntimeError("neočekivano")
+
+    monkeypatch.setattr(http, "fetch_site", puca)
+    snapshots = asyncio.run(scan_domains([DomainInput(domain="puca.test")], load_config()))
+    assert len(snapshots) == 1
+    assert snapshots[0].errors and snapshots[0].errors[0].kind == "RuntimeError"
+
+
+def test_klijent_bez_provere_sertifikata_se_pravi_jednom():
+    async def run():
+        async with Fetcher(load_config()) as fetcher:
+            prvi = fetcher._pick_client(verify=False)
+            return prvi, fetcher._pick_client(verify=False), fetcher._pick_client(verify=True)
+
+    prvi, drugi, sa_proverom = asyncio.run(run())
+    assert prvi is drugi and prvi is not sa_proverom
+
+
+@pytest.mark.parametrize(
+    "exc, expected",
+    [
+        pytest.param(httpx.WriteTimeout("x", request=None), "timeout", id="ke-ostali-istek"),
+        pytest.param(httpx.PoolTimeout("x", request=None), "timeout", id="ke-pool-istek"),
+    ],
+)
+def test_klasifikacija_ostalih_isteka(exc, expected):
+    assert _classify(exc)[0] == expected

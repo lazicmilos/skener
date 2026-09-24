@@ -57,8 +57,8 @@ def _lang_usable(lang: str | None) -> bool:
     description="<html> nema atribut lang.",
     threshold="atribut lang ne postoji",
     message=(
-        "U kodu sajta nigde ne piše na kom je jeziku. Pretraživači zato nagađaju kom tržištu "
-        "da ga nude, a čitači ekrana ga izgovaraju pogrešnim izgovorom."
+        "U kodu sajta nigde ne piše na kom je jeziku. Čitači ekrana, koje koriste slepi i "
+        "slabovidi posetioci, zato ne znaju kojim izgovorom da ga čitaju."
     ),
     tech="{stranica}: <html> bez lang atributa",
 )
@@ -83,7 +83,7 @@ def lang_missing(snapshot: SiteSnapshot, ctx: Context):
     threshold="lang ∈ {zxx, und, prazno} ili ne parsira kao BCP-47",
     message=(
         "Sajt je u kodu označen oznakom „{lang}”, koja ne označava nijedan jezik. "
-        "Za pretraživače je to isto kao da oznake nema."
+        "Za čitače ekrana je to isto kao da oznake nema."
     ),
     tech='{stranica}: lang="{lang}" nije upotrebljiv BCP-47 kod',
 )
@@ -107,7 +107,9 @@ def lang_invalid(snapshot: SiteSnapshot, ctx: Context):
     "i18n.lang.mismatch",
     level=1,
     category="i18n",
-    base_severity="high",
+    # medium, ne high: Google jezik određuje iz sadržaja i `lang` ne koristi, pa je
+    # posledica pristupačnost, ne pozicija u pretrazi (docs/izvestaj-testiranja-100.md, O-3).
+    base_severity="medium",
     requires=["home"],
     description="Sadržaj je pouzdano srpski, a lang oznaka govori drugo.",
     threshold=(
@@ -115,8 +117,9 @@ def lang_invalid(snapshot: SiteSnapshot, ctx: Context):
         "uz lang koji ne počinje sa sr"
     ),
     message=(
-        "Sadržaj sajta je na srpskom, ali je u kodu označen kao „{lang}”. Pretraživači ga "
-        "zato nude pogrešnom tržištu, a čitači ekrana ga izgovaraju engleskim izgovorom."
+        "Sadržaj sajta je na srpskom, ali je u kodu označen kao „{lang}”. Čitači ekrana, koje "
+        "koriste slepi i slabovidi posetioci, zato srpski tekst izgovaraju po pravilima tog "
+        "jezika, pa je teško razumljiv."
     ),
     tech='{stranica}: lang="{lang}", sadržaj prepoznat kao {prepoznat_jezik} '
     "(ćirilica {cirilica_udeo}, dijakritici {dijakritici_udeo}, {duzina_teksta} znakova)",

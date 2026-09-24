@@ -25,8 +25,8 @@ def _og_count(snapshot: SiteSnapshot) -> int:
     description="Početna nema og:title.",
     threshold="nedostaje <meta property=og:title>",
     message=(
-        "Kada neko podeli link sajta u poruci ili na Facebook-u, ne prikazuje se ni naslov "
-        "ni slika — samo gola adresa. Gostima to izgleda kao sumnjiv link."
+        "Kada neko podeli link sajta u poruci ili na Facebook-u, nema pripremljenog naslova "
+        "za pregled linka, pa platforme uzimaju običan naslov strane ili samu adresu."
     ),
     tech="{stranica}: nedostaje og:title (ukupno og oznaka: {og_oznaka_ukupno})",
 )
@@ -53,8 +53,8 @@ def og_title_missing(snapshot: SiteSnapshot, ctx: Context):
     description="Početna nema og:description.",
     threshold="nedostaje <meta property=og:description>",
     message=(
-        "Kad se link sajta podeli, ispod naslova nema nijedne rečenice koja objašnjava šta "
-        "sajt nudi. Onaj ko vidi link nema razlog da ga otvori."
+        "Kad se link sajta podeli, platforme nemaju pripremljen opis, pa same biraju tekst sa "
+        "strane ili ne prikazuju nijedan."
     ),
     tech="{stranica}: nedostaje og:description (ukupno og oznaka: {og_oznaka_ukupno})",
 )
@@ -81,8 +81,8 @@ def og_description_missing(snapshot: SiteSnapshot, ctx: Context):
     description="Početna nema og:image.",
     threshold="nedostaje <meta property=og:image>",
     message=(
-        "Podeljen link sajta nema sliku. U Viber i WhatsApp grupama, gde se preporuke i "
-        "šalju, link bez slike prolazi neprimećeno pored onih koji je imaju."
+        "Podeljen link sajta nema pripremljenu sliku. U Viber i WhatsApp grupama, gde se "
+        "preporuke često šalju, link bez slike lako prođe neprimećeno."
     ),
     tech="{stranica}: nedostaje og:image (ukupno og oznaka: {og_oznaka_ukupno})",
 )

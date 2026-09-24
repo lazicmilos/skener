@@ -340,6 +340,23 @@ def test_blokiran_sajt_ne_dobija_nalaze_iz_odbijenih_zahteva():
 
 
 # --------------------------------------------------------------------------- #
+# O-3: nalaz o jeziku sme da tvrdi samo ono što je tačno
+# --------------------------------------------------------------------------- #
+def test_mismatch_poruka_ne_tvrdi_nista_o_pretrazivacima():
+    """Google jezik stranice određuje iz sadržaja, `lang` atribut ne koristi.
+
+    Tvrdnja „pretraživači ga nude pogrešnom tržištu" bila bi netačna u mejlu
+    klijentu. Tačan i proverljiv argument je čitač ekrana.
+    """
+    site = clean_site()
+    site.home.lang = "en-US"
+    nalaz = run_level(1, site)["i18n.lang.mismatch"].findings[0]
+    assert "pretraživač" not in nalaz.message_client.lower()
+    assert "čitač" in nalaz.message_client.lower()
+    assert nalaz.severity == "medium"
+
+
+# --------------------------------------------------------------------------- #
 # BUG-004: sajt dohvaćen preko http-a posle neuspelog https-a — sertifikat
 # nije proveren, pa „ok" ne sme da stoji
 # --------------------------------------------------------------------------- #

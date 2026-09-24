@@ -7,6 +7,7 @@ ozbiljnošću koja važi — ne tri nalaza za istu stranicu (§7.3).
 from __future__ import annotations
 
 from skener.checks.registry import Context, check, finding, ok, unknown
+from skener.checks.srpski import decimalni, sa_brojem
 from skener.models import SiteSnapshot
 
 COMPRESSED = {"gzip", "br", "zstd", "deflate"}
@@ -21,10 +22,14 @@ def _tier(value: float, tiers: dict[str, float]) -> str | None:
     return None
 
 
+def _mb_per_s(ctx: Context) -> float:
+    """Sporija mobilna veza: 4,8 Mb/s = 0,6 MB/s (§10.3)."""
+    return ctx.th("thresholds.perf.mobile_speed_mbps") / 8
+
+
 def _seconds_on_mobile(mb: float, ctx: Context) -> float:
     """0,6 MB/s + režija. Pretpostavka mora da stoji u fusnoti izveštaja (§10.3)."""
-    mb_per_s = ctx.th("thresholds.perf.mobile_speed_mbps") / 8
-    return round(mb / mb_per_s + ctx.th("report.mobile_overhead_s"), 1)
+    return round(mb / _mb_per_s(ctx) + ctx.th("report.mobile_overhead_s"), 1)
 
 
 # --------------------------------------------------------------------------- #
@@ -34,15 +39,17 @@ def _seconds_on_mobile(mb: float, ctx: Context) -> float:
     "perf.compression.missing",
     level=1,
     category="perf",
-    base_severity="medium",
+    # low, ne medium: ušteda na samom HTML-u je desetinke sekunde (docs/izvestaj-testiranja-100.md).
+    base_severity="low",
     requires=["home"],
     description="Server ne šalje HTML kompresovan.",
     threshold="content-encoding ∉ {gzip, br, zstd, deflate} i HTML > 50 kB",
     message=(
-        "Server šalje stranicu nesažetu, iako bi sažimanje smanjilo prenos sa {kb} kB na "
-        "otprilike četvrtinu. Na mobilnoj vezi to je sekunda i po razlike do prvog prikaza."
+        "Server šalje stranicu nesažetu ({kb} kB). Sažimanje bi prenos smanjilo na otprilike "
+        "četvrtinu, što na sporijoj mobilnoj vezi ({brzina} Mb/s) skraćuje učitavanje za oko "
+        "{usteda_s} s."
     ),
-    tech="content-encoding={kodiranje}, html_bytes={bajtova} (dekodirano)",
+    tech="content-encoding={kodiranje}, html_bytes={bajtova} (dekodirano), ušteda ≈ {usteda_s} s",
 )
 def compression_missing(snapshot: SiteSnapshot, ctx: Context):
     home = snapshot.home
@@ -57,6 +64,9 @@ def compression_missing(snapshot: SiteSnapshot, ctx: Context):
             "kodiranje": encoding or "nema",
             "bajtova": home.html_bytes,
             "kb": round(home.html_bytes / 1024),
+            # gzip i br svode HTML na otprilike četvrtinu; ušteda je ostatak, na sporijoj vezi
+            "usteda_s": round(home.html_bytes * 0.75 / BYTES_PER_MB / _mb_per_s(ctx), 1),
+            "brzina": ctx.th("thresholds.perf.mobile_speed_mbps"),
         },
         urls=[home.final_url or home.url],
     )
@@ -99,7 +109,7 @@ def redirect_chain(snapshot: SiteSnapshot, ctx: Context):
     threshold="html_bytes > thresholds.perf.html_size_kb (500 kB)",
     message=(
         "Sam kod početne strane teži {kb} kB, pre slika i skripti. Pretraživač mora sve to "
-        "da pročita pre nego što išta nacrta."
+        "da preuzme i obradi, što usporava prikaz, najviše na telefonu."
     ),
     tech="html_bytes={bajtova} > {prag_kb} kB",
 )
@@ -128,10 +138,13 @@ def html_size(snapshot: SiteSnapshot, ctx: Context):
     description="Ukupna težina početne strane.",
     threshold="> 1,5 MB medium · > 3 MB high · > 8 MB critical",
     message=(
-        "Početna strana prenosi {mb} MB. Na prosečnoj mobilnoj vezi to je oko {sekundi} "
-        "sekundi do prikaza; većina posetilaca ne čeka toliko."
+        "Početna strana prenosi {mb} MB{uz_video}. Na sporijoj mobilnoj vezi ({brzina} Mb/s) za "
+        "to je potrebno oko {sekundi} s, a mnogi posetioci ne čekaju toliko."
     ),
-    tech="total_bytes={bajtova} ({mb} MB), zahteva={zahteva}, nemereno={nemereno}, reached={reached}",
+    tech=(
+        "total_bytes={bajtova}, bez videa {mb} MB, video {video_mb} MB, zahteva={zahteva}, "
+        "nemereno={nemereno}, reached={reached}"
+    ),
 )
 def page_weight(snapshot, ctx: Context):
     network = snapshot.network
@@ -143,7 +156,11 @@ def page_weight(snapshot, ctx: Context):
             f"{network.unmeasured_responses} odgovora nije izmereno (prag {max_unmeasured})",
         )
 
-    mb = network.total_bytes / BYTES_PER_MB
+    # Video se skida koliko vreme merenja dozvoli — isti sajt je izmeren jednom 8,5, a
+    # drugi put 26,9 MB — pa ne ulazi u prag, nego stoji posebno u poruci (O-2).
+    video = network.bytes_by_type.get("media", 0)
+    video_mb = round(video / BYTES_PER_MB, 1)
+    mb = (network.total_bytes - video) / BYTES_PER_MB
     severity = _tier(mb, ctx.th("thresholds.perf.page_weight_mb"))
     if severity is None:
         if snapshot.timing.reached == "timeout":
@@ -156,7 +173,10 @@ def page_weight(snapshot, ctx: Context):
         evidence={
             "bajtova": network.total_bytes,
             "mb": round(mb, 1),
+            "video_mb": video_mb,
+            "uz_video": f" (video dodatno {decimalni(video_mb)} MB)" if video else "",
             "sekundi": _seconds_on_mobile(mb, ctx),
+            "brzina": ctx.th("thresholds.perf.mobile_speed_mbps"),
             "zahteva": network.request_count,
             "nemereno": network.unmeasured_responses,
             "reached": snapshot.timing.reached,
@@ -175,8 +195,8 @@ def page_weight(snapshot, ctx: Context):
     description="Broj mrežnih zahteva pri otvaranju početne.",
     threshold="> 100 medium · > 150 high",
     message=(
-        "Otvaranje početne strane pokreće {zahteva} odvojenih preuzimanja. Na mobilnoj vezi "
-        "svako od njih ima svoju cenu čekanja, nezavisno od veličine."
+        "Otvaranje početne strane pokreće {preuzimanja}. Svako ima svoju "
+        "režiju, što se najviše oseti na mobilnoj vezi."
     ),
     tech="request_count={zahteva} (reached={reached})",
 )
@@ -191,7 +211,13 @@ def request_count(snapshot, ctx: Context):
         request_count.spec,
         ctx,
         severity=severity,
-        evidence={"zahteva": count, "reached": snapshot.timing.reached},
+        evidence={
+            "zahteva": count,
+            "preuzimanja": sa_brojem(
+                count, "odvojeno preuzimanje", "odvojena preuzimanja", "odvojenih preuzimanja"
+            ),
+            "reached": snapshot.timing.reached,
+        },
         urls=[snapshot.url],
     )
 
@@ -205,8 +231,8 @@ def request_count(snapshot, ctx: Context):
     description="Vreme do potpunog učitavanja početne.",
     threshold="> 4 s medium · > 8 s high · prekid posle tvrdog limita = high",
     message=(
-        "Početnoj strani treba {sekundi} sekundi da se do kraja učita. Posetilac koji dolazi "
-        "sa telefona za to vreme najčešće odustane."
+        "Početnoj strani treba {sekundi} s da se do kraja učita. Mnogi posetioci ne čekaju "
+        "toliko, naročito na telefonu."
     ),
     tech="load_ms={load_ms}, reached={reached}",
 )
@@ -250,7 +276,7 @@ def load_time(snapshot, ctx: Context):
     threshold="≥ 3 slike sa odnosom > 2,5 ili procenjen višak > 700 kB",
     message=(
         "Sajt šalje slike znatno veće nego što se prikazuju — oko {kb} kB nepotrebnog prenosa "
-        "pri svakom učitavanju."
+        "pri prvoj poseti."
     ),
     tech="{broj_slika} slika sa ratio > {prag_odnosa}, procenjen višak {kb} kB, nemereno {nemereno}",
 )
@@ -292,8 +318,8 @@ def img_oversized(snapshot, ctx: Context):
     description="JavaScript greške u konzoli.",
     threshold="> thresholds.qa.console_errors (3)",
     message=(
-        "Na početnoj strani se javlja {greske} JavaScript grešaka. Deo stranice zato može da "
-        "ne radi kod dela posetilaca, najčešće na starijim telefonima."
+        "Na početnoj strani ima {greske_tekst}. Deo stranice zato možda ne "
+        "radi kako treba."
     ),
     tech="console errors={greske}, warnings={upozorenja}",
 )
@@ -307,6 +333,9 @@ def console_errors(snapshot, ctx: Context):
         ctx,
         evidence={
             "greske": console.errors,
+            "greske_tekst": sa_brojem(
+                console.errors, "JavaScript grešku", "JavaScript greške", "JavaScript grešaka"
+            ),
             "upozorenja": console.warnings,
             "primer": console.samples[0] if console.samples else None,
         },

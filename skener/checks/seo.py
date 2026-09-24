@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Callable
 
 from skener.checks.registry import Context, check, finding, ok, unknown
+from skener.checks.srpski import sa_brojem
 from skener.fetch.urls import collapse_ws, path_group
 from skener.models import PageSnapshot, SiteSnapshot
 
@@ -79,9 +80,9 @@ def canonical_missing(snapshot: SiteSnapshot, ctx: Context):
     description="Više stranica iz različitih delova sajta prijavljuje isti canonical.",
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim canonical-om",
     message=(
-        "Sve proverene stranice sajta prijavljuju Google-u istu adresu kao zvaničnu "
-        "({canonical}). Za Google to znači da sajt praktično ima jednu stranicu — ostalih "
-        "{n} se ne takmiči ni za šta u pretrazi."
+        "Više proverenih stranica sajta ({stranica}) prijavljuje Google-u istu adresu kao "
+        "zvaničnu ({canonical}). Google ih zato može smatrati kopijama jedne stranice i "
+        "izostaviti iz pretrage."
     ),
     tech=(
         "canonical_normalized == {canonical} na {stranica} stranica "
@@ -120,8 +121,8 @@ def canonical_duplicate(snapshot: SiteSnapshot, ctx: Context):
     description="Početna strana nema <title> ili je prazan.",
     threshold="prazan ili nepostojeći <title>",
     message=(
-        "Početna strana nema naslov. U Google rezultatima i u kartici pretraživača umesto "
-        "naslova stoji goli deo adrese, a to se retko klikne."
+        "Početna strana nema naslov. U kartici pretraživača zato stoji goli deo adrese, a "
+        "Google u rezultatima sam smišlja naslov iz sadržaja strane."
     ),
     tech="{stranica}: <title> prazan ili nedostaje (dužina {duzina_naslova})",
 )
@@ -148,7 +149,7 @@ def title_missing(snapshot: SiteSnapshot, ctx: Context):
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim naslovom",
     message=(
         "Različite stranice sajta imaju isti naslov („{naslov}”). U Google rezultatima "
-        "izgledaju kao {stranica} kopije iste stranice, pa se međusobno potiskuju."
+        "izgledaju kao {kopije} iste stranice, pa Google teže bira koju da prikaže."
     ),
     tech="identičan normalizovan <title> na {stranica} stranica iz {grupa_putanja} grupa putanja",
 )
@@ -162,6 +163,7 @@ def title_duplicate(snapshot: SiteSnapshot, ctx: Context):
         ctx,
         evidence={
             "naslov": value,
+            "kopije": sa_brojem(len(pages), "kopija", "kopije", "kopija"),
             "stranica": len(pages),
             "grupa_putanja": len(groups),
             "uzorak": _sample_note(snapshot),
@@ -182,8 +184,8 @@ def title_duplicate(snapshot: SiteSnapshot, ctx: Context):
     description="Početna strana nema <meta name=description>.",
     threshold="prazan ili nepostojeći meta opis",
     message=(
-        "Početna strana nema kratak opis za Google. Ispod naslova u rezultatima pretrage "
-        "Google tada sam iščupa nasumičnu rečenicu sa strane, često menija ili cookie poruke."
+        "Početna strana nema kratak opis za Google. Google tada sam bira tekst sa strane za "
+        "prikaz ispod naslova, a to ume da bude deo menija ili obaveštenja o kolačićima."
     ),
     tech="{stranica}: nedostaje <meta name=description> (dužina {duzina_opisa})",
 )
@@ -209,7 +211,7 @@ def description_missing(snapshot: SiteSnapshot, ctx: Context):
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim opisom",
     message=(
         "Različite stranice sajta imaju isti opis u Google rezultatima. Posetilac iz pretrage "
-        "ne vidi po čemu se {stranica} stranice razlikuju, pa bira konkurenta."
+        "zato ne vidi razliku između {stranice}."
     ),
     tech="identičan normalizovan meta opis na {stranica} stranica iz {grupa_putanja} grupa putanja",
 )
@@ -225,6 +227,7 @@ def description_duplicate(snapshot: SiteSnapshot, ctx: Context):
         ctx,
         evidence={
             "opis": value,
+            "stranice": sa_brojem(len(pages), "stranice", "stranice", "stranica"),
             "stranica": len(pages),
             "grupa_putanja": len(groups),
             "uzorak": _sample_note(snapshot),
@@ -245,8 +248,8 @@ def description_duplicate(snapshot: SiteSnapshot, ctx: Context):
     description="Nacrtana stranica nema nijedan <h1>.",
     threshold="h1_count == 0 posle učitavanja u browseru",
     message=(
-        "Stranica nema glavni naslov u kodu. Google iz njega zaključuje o čemu je strana, "
-        "a čitači ekrana po njemu grade sadržaj — bez njega je stranica za oba samo gomila teksta."
+        "Stranica nema glavni naslov (h1). Naslovi su jedan od signala po kojima Google "
+        "razume o čemu je strana, a korisnici čitača ekrana se po njima kreću kroz stranicu."
     ),
     tech="h1_count == {h1_count} (mereno u browseru, reached={reached})",
 )
@@ -272,8 +275,8 @@ def h1_missing(snapshot, ctx: Context):
     description="Stranica ima previše <h1> naslova.",
     threshold="h1_count > thresholds.seo.h1_multiple (3)",
     message=(
-        "Stranica ima {h1_count} glavnih naslova umesto jednog. Pretraživaču nije jasno koji "
-        "je glavni, pa težinu razvlači na sve."
+        "Stranica ima {naslovi} (h1) umesto jednog. Korisnicima čitača ekrana "
+        "je tada teže da prepoznaju glavnu temu strane."
     ),
     tech="h1_count == {h1_count} > {prag}",
 )
@@ -284,6 +287,10 @@ def h1_multiple(snapshot, ctx: Context):
     return finding(
         h1_multiple.spec,
         ctx,
-        evidence={"h1_count": snapshot.dom.h1_count, "prag": limit},
+        evidence={
+            "h1_count": snapshot.dom.h1_count,
+            "naslovi": sa_brojem(snapshot.dom.h1_count, "glavni naslov", "glavna naslova", "glavnih naslova"),
+            "prag": limit,
+        },
         urls=[snapshot.url],
     )

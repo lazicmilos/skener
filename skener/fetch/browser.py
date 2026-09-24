@@ -185,10 +185,38 @@ def est_waste_kb(transfer_bytes: int, natural: Sequence[int], client: Sequence[i
     return round(max(transfer_bytes / 1024 * (1 - used), 0.0), 1)
 
 
-async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnapshot:
+class _LoadSlot:
+    """Isključivo pravo na učitavanje do `load` (BUG-006).
+
+    Tri sajta koja se učitavaju istovremeno dele istu vezu i produžavaju jedan
+    drugom vreme učitavanja do 4,6×. Zato se učitava jedan po jedan; skrol, DOM i
+    merenje težine i dalje idu paralelno. Oslobađa se tačno jednom, ma kako se
+    merenje završilo.
+    """
+
+    def __init__(self, lock: asyncio.Lock | None) -> None:
+        self._lock = lock
+        self._held = False
+
+    async def acquire(self) -> None:
+        if self._lock is not None:
+            await self._lock.acquire()
+            self._held = True
+
+    def release(self) -> None:
+        if self._held:
+            self._held = False
+            self._lock.release()
+
+
+async def capture(
+    browser: Any, site: SiteSnapshot, config: dict, slot: _LoadSlot | None = None
+) -> BrowserSnapshot:
     """Nov kontekst po domenu = prazan keš.
 
     Bez toga drugi domen sa istog CDN-a meri lažno manju težinu (§15, zamka 10).
+    `slot` se oslobađa čim se stranica učita, pa sledeći sajt meri svoje vreme bez
+    tuđeg saobraćaja na vezi.
     """
     from playwright.async_api import Error as PlaywrightError
 
@@ -236,6 +264,8 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
                 await page.wait_for_load_state(
                     "networkidle", timeout=get(config, "browser.idle_after_load_ms")
                 )
+        if slot is not None:
+            slot.release()
 
         # Bez skrola sve lazy slike imaju naturalWidth == 0 i provera tiho nalazi
         # nulu (§15, zamka 2).
@@ -264,6 +294,8 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
         snapshot.errors.append(SnapshotError("browser", type(exc).__name__, str(exc)[:300]))
         snapshot.status = "failed"
     finally:
+        if slot is not None:
+            slot.release()
         # I zatvaranje ume da zaglavi; posle tvrdog limita ne sme da ga produži.
         with contextlib.suppress(Exception):
             await asyncio.wait_for(context.close(), CLOSE_TIMEOUT_S)
@@ -318,14 +350,19 @@ async def _read_dom(
     )
 
 
-async def _capture_within_limit(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnapshot:
+async def _capture_within_limit(
+    browser: Any, site: SiteSnapshot, config: dict, load_lock: asyncio.Lock | None = None
+) -> BrowserSnapshot:
     """Tvrd limit po domenu — poslednja odbrana od zastoja za koji još ne znamo.
 
-    Jedan domen koji visi ne sme da zaustavi ostalih 199 (§8.2).
+    Jedan domen koji visi ne sme da zaustavi ostalih 199 (§8.2). Čekanje na red za
+    učitavanje nije rad na domenu, pa ne ulazi u limit.
     """
     limit_s = get(config, "browser.max_seconds_per_domain")
+    slot = _LoadSlot(load_lock)
+    await slot.acquire()
     try:
-        return await asyncio.wait_for(capture(browser, site, config), limit_s)
+        return await asyncio.wait_for(capture(browser, site, config, slot), limit_s)
     except TimeoutError:
         log.error("nivo 2 prekinut posle %s s", limit_s, extra={"domain": site.domain})
         return BrowserSnapshot(
@@ -335,6 +372,18 @@ async def _capture_within_limit(browser: Any, site: SiteSnapshot, config: dict) 
             status="failed",
             errors=[SnapshotError("browser", "timeout", f"prekinut posle tvrdog limita od {limit_s} s")],
         )
+    finally:
+        slot.release()
+
+
+def _tiho_za_zatvoren_kontekst(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+    """Posle tvrdog limita Playwright-ova navigacija ostane bez čitaoca; kad se kontekst
+    zatvori, njena greška je očekivana posledica prekida, ne kvar (BUG-007). Sve ostalo
+    ide dalje kao i do sada.
+    """
+    if type(context.get("exception")).__name__ == "TargetClosedError":
+        return
+    loop.default_exception_handler(context)
 
 
 def _launch_options(config: dict) -> dict[str, Any]:
@@ -356,6 +405,11 @@ async def capture_all(
     results: dict[str, BrowserSnapshot] = {}
     # Nivo 2 ide na 3 istovremena konteksta, ne 8: svaki je stotine MB RAM-a (§8.1).
     limit = asyncio.Semaphore(get(config, "browser.concurrency"))
+    # Učitava se jedan po jedan; ostatak merenja ide paralelno (BUG-006).
+    load_lock = asyncio.Lock()
+    # Petlja pripada ovom prolazu (`asyncio.run` po nivou), pa se rukovalac ne vraća:
+    # zaostale greške stižu i posle povratka, kad ih sakupljač smeća pokupi.
+    asyncio.get_running_loop().set_exception_handler(_tiho_za_zatvoren_kontekst)
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(**_launch_options(config))
@@ -364,7 +418,7 @@ async def capture_all(
             async def one(site: SiteSnapshot) -> tuple[str, BrowserSnapshot]:
                 async with limit:
                     log.info("nivo 2 počinje", extra={"domain": site.domain})
-                    snapshot = await _capture_within_limit(browser, site, config)
+                    snapshot = await _capture_within_limit(browser, site, config, load_lock)
                     if snapshot_dir is not None:
                         store.write_browser(snapshot_dir, snapshot)
                     log.info(

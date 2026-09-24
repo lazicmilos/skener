@@ -142,11 +142,18 @@ def select_for_level2(
     vremena i ti odustaneš od alata.
     """
     limit = get(config, "escalation.max_level2")
-    scored = sorted(
-        candidates,
-        key=lambda pair: (-level1_score(pair[0], pair[1], config), pair[0].domain),
-    )
-    return [site for site, _ in scored[:limit]]
+
+    def key(pair: tuple[SiteSnapshot, Sequence[CheckResult]]) -> tuple[bool, float, str]:
+        site, results = pair
+        findings, _ = collect(results)
+        # Kandidat bez nalaza ≥ medium je kandidat samo zbog signala koje vidi browser
+        # (prazan HTML, nema h1, spora početna). Nivo 2 mu je jedina šansa za pravi
+        # nalaz; bez njega u izveštaju stoji kao „0 nalaza", a nije ni meren (BUG-005).
+        # Zato ide prvi, pa tek onda ostali po skoru nivoa 1.
+        jak = any(SEVERITY_ORDER[f.severity] >= SEVERITY_ORDER["medium"] for f in findings)
+        return (jak, -level1_score(site, results, config), site.domain)
+
+    return [site for site, _ in sorted(candidates, key=key)[:limit]]
 
 
 def analyze(

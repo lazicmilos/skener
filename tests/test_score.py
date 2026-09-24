@@ -253,11 +253,14 @@ def test_domen_bez_pocetne_ne_ide_na_nivo_2():
 
 
 def test_gornji_limit_bira_najvise_skorove():
-    """Bez limita dvonivojska arhitektura nema svrhu (§15, zamka 8)."""
+    """Bez limita dvonivojska arhitektura nema svrhu (§15, zamka 8).
+
+    Među kandidatima koji već imaju jak nalaz nivoa 1 prvi idu najviši skorovi.
+    """
     kandidati = []
     for i in range(5):
         site = clean_site(domain=f"d{i}.rs", industry="restoran")
-        severity = "critical" if i == 4 else "low"
+        severity = "critical" if i == 4 else "medium"
         kandidati.append((site, [nalaz("perf.page.weight", "perf", severity)]))
 
     config = {**CONFIG, "escalation": {**CONFIG["escalation"], "max_level2": 2}}
@@ -270,3 +273,25 @@ def test_skor_nivoa_1_ne_broji_nalaze_nivoa_2():
     site = clean_site(industry="restoran")
     results = [nalaz("seo.canonical.missing", "seo", "high")]
     assert level1_score(site, results, CONFIG) == 24.0
+
+
+def test_limit_ne_odseca_sajt_kome_je_nivo_2_jedina_sansa():
+    """BUG-005: izbor po skoru nivoa 1 uvek je odsecao sajtove sa skorom 0.
+
+    Takav sajt je kandidat samo zbog signala koji se vide tek u browseru (spora
+    početna, nema h1 u sirovom HTML-u). Ako ne ode na nivo 2, u izveštaju stoji
+    kao „0 nalaza", a zapravo nije ni meren. Sajtovi koji već imaju nalaz nivoa 1
+    bar imaju razlog za mejl.
+    """
+    kandidati = [
+        (clean_site(domain=f"nalaz{i}.rs"), [nalaz("seo.description.missing", "seo", "medium")])
+        for i in range(3)
+    ]
+    spor = clean_site(domain="spor.rs")
+    spor.entry.elapsed_ms = 2400
+    kandidati.append((spor, []))
+
+    config = {**CONFIG, "escalation": {**CONFIG["escalation"], "max_level2": 2}}
+    izabrani = [site.domain for site in select_for_level2(kandidati, config)]
+    assert "spor.rs" in izabrani, f"izabrani: {izabrani}"
+    assert len(izabrani) == 2

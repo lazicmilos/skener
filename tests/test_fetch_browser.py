@@ -256,3 +256,76 @@ def test_procena_viska(transfer_kb, natural, client, expected):
 
 def test_neizmerena_slika_ne_daje_negativan_visak():
     assert est_waste_kb(1000, [10, 10], [500, 500]) == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# BUG-006: vreme učitavanja se meri dok niko drugi ne učitava
+# --------------------------------------------------------------------------- #
+def test_ucitavanja_razlicitih_sajtova_se_ne_preklapaju():
+    """Tri sajta koja se učitavaju istovremeno dele vezu i produžavaju jedan drugom
+    `load` do 4,6× (izmereno u prolazu nad 100 domena). Učitavanje do `load` zato
+    ide jedno po jedno; skrol i čitanje DOM-a i dalje idu paralelno.
+    """
+    import time
+
+    from skener.fetch.browser import capture_all
+
+    trenuci: dict[str, dict[str, float]] = {}
+
+    def strana(ime: str):
+        def odgovor() -> Response:
+            trenuci.setdefault(ime, {})["html"] = time.monotonic()
+            return Response(b"<html><h1>Strana</h1><img src='/spora.png'></html>")
+
+        return odgovor
+
+    def slika(ime: str):
+        def odgovor() -> Response:
+            trenuci.setdefault(ime, {})["slika"] = time.monotonic()
+            return Response(png(10, 10), headers={"content-type": "image/png"}, delay=1.0)
+
+        return odgovor
+
+    with FakeSite(extra={"/": strana("a"), "/spora.png": slika("a")}) as a, FakeSite(
+        extra={"/": strana("b"), "/spora.png": slika("b")}
+    ) as b:
+        sajtovi = [
+            SiteSnapshot(
+                domain=s.base_url,
+                pages=[PageSnapshot(url=s.base_url + "/", final_url=s.base_url + "/", status=200)],
+                entry=Entry(requested_url=s.base_url + "/", final_url=s.base_url + "/", status=200),
+            )
+            for s in (a, b)
+        ]
+        cfg = load_config()
+        cfg["browser"]["concurrency"] = 2
+        asyncio.run(capture_all(sajtovi, cfg))
+
+    prvi, drugi = sorted(trenuci.values(), key=lambda t: t["html"])
+    # Slika prvog sajta kasni 1 s i drži njegov `load`; drugi sme da krene tek posle.
+    assert drugi["html"] >= prvi["slika"] + 0.9, (
+        f"drugi sajt je počeo {drugi['html'] - prvi['html']:.2f} s posle prvog, dok se prvi još učitavao"
+    )
+
+
+def test_prekid_posle_tvrdog_limita_ne_ostavlja_gresku_u_logu(caplog):
+    """BUG-007: posle prekida Playwright-ova navigacija ostane bez čitaoca, pa asyncio
+    kasnije prijavi „Future exception was never retrieved" — ERROR za nešto što nije kvar.
+    """
+    import gc
+    import logging
+
+    cfg = load_config()
+    cfg["browser"]["max_seconds_per_domain"] = 2
+    with caplog.at_level(logging.ERROR, logger="asyncio"), FakeSite(
+        extra={
+            "/": Response(b"<html><h1>Spora</h1><img src='/spora.png'></html>"),
+            "/spora.png": Response(png(10, 10), headers={"content-type": "image/png"}, delay=20),
+        }
+    ) as site:
+        snimak = snimi(site, cfg)
+        gc.collect()
+
+    assert snimak.status == "failed"
+    zaostale = [r.getMessage() for r in caplog.records if r.name == "asyncio"]
+    assert not zaostale, zaostale

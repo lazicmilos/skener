@@ -245,3 +245,88 @@ def test_scan_bez_identiteta_odbija_pre_ijednog_zahteva(tmp_path, monkeypatch):
         with pytest.raises(SystemExit, match="identitet"):
             cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), "--level", "1"])
         assert site.requests == [], f"zahtevi pre provere identiteta: {site.requests}"
+
+
+# --------------------------------------------------------------------------- #
+# Pogađanje grešaka: lista iz Excel-a na srpskom Windows-u. Kupac nije programer.
+# --------------------------------------------------------------------------- #
+def test_csv_iz_excela_sa_tackom_zarezom(tmp_path):
+    """Srpska podešavanja Windows-a: Excel „CSV" razdvaja kolone sa `;`."""
+    path = tmp_path / "d.csv"
+    path.write_text("domain;industry;note\nmensa.rs;institucija;beleška\n", encoding="utf-8")
+    rows = cli.read_domains(path)
+    assert [(r.domain, r.industry, r.note) for r in rows] == [("mensa.rs", "institucija", "beleška")]
+
+
+def test_csv_u_windows_1250(tmp_path):
+    """Excel bez „UTF-8" opcije čuva u windows-1250; ranije je ovo bio traceback."""
+    path = tmp_path / "d.csv"
+    path.write_bytes("domain,industry,note\nmensa.rs,institucija,čćžšđ\n".encode("cp1250"))
+    rows = cli.read_domains(path)
+    assert rows[0].note == "čćžšđ"
+
+
+def test_csv_duplikati_se_skeniraju_jednom(tmp_path):
+    """Isti domen dva puta = dva puta tuđ sajt i dva reda u izveštaju sa istim snapshotom."""
+    path = tmp_path / "d.csv"
+    path.write_text(
+        "domain,industry\nmensa.rs,institucija\nMENSA.RS,hotel\nangolo.rs,restoran\n", encoding="utf-8"
+    )
+    rows = cli.read_domains(path)
+    assert [r.domain for r in rows] == ["mensa.rs", "angolo.rs"]
+    assert rows[0].industry == "institucija", "važi prvo pojavljivanje"
+
+
+def test_csv_sa_bom_oznakom(tmp_path):
+    path = tmp_path / "d.csv"
+    path.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8-sig")
+    assert [r.domain for r in cli.read_domains(path)] == ["mensa.rs"]
+
+
+@pytest.mark.parametrize(
+    "sadrzaj",
+    [
+        pytest.param(b"", id="nv-prazan-fajl"),
+        pytest.param(b"domain,industry\n", id="nv-samo-zaglavlje"),
+        pytest.param(b"domain,industry\n\n  \n", id="nv-prazni-redovi"),
+    ],
+)
+def test_csv_bez_domena_puca_razumljivo(tmp_path, sadrzaj):
+    path = tmp_path / "d.csv"
+    path.write_bytes(sadrzaj)
+    with pytest.raises(SystemExit):
+        cli.read_domains(path)
+
+
+@pytest.mark.parametrize(
+    "argumenti",
+    [
+        pytest.param(["--concurrency", "0"], id="gv-concurrency-0"),
+        pytest.param(["--concurrency", "-1"], id="nv-concurrency-negativan"),
+        pytest.param(["--concurrency", "osam"], id="nv-concurrency-tekst"),
+        pytest.param(["--max-level2", "-1"], id="nv-max-level2-negativan"),
+    ],
+)
+def test_nevazeci_brojevi_na_komandnoj_liniji_se_odbijaju(tmp_path, argumenti):
+    domains = tmp_path / "d.csv"
+    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    with pytest.raises(SystemExit) as izlaz:
+        cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), *argumenti])
+    assert izlaz.value.code == 2, "argparse odbija pre ijednog zahteva"
+
+
+@pytest.mark.skipif(not hasattr(__import__("time"), "tzset"), reason="tzset postoji samo na Unix-u")
+def test_vreme_u_logu_je_zaista_utc(monkeypatch):
+    """Pogađanje grešaka (vremenska zona): „Z" na kraju tvrdi UTC, pa vreme mora biti UTC."""
+    import logging
+    import time
+
+    monkeypatch.setenv("TZ", "Europe/Belgrade")
+    time.tzset()
+    try:
+        zapis = logging.LogRecord("skener", logging.INFO, __file__, 1, "poruka", None, None)
+        zapis.created = 1_790_000_000  # 2026-09-21T14:13:20Z; u Beogradu je tada 16:13
+        assert json.loads(cli.JsonLines().format(zapis))["ts"] == "2026-09-21T14:13:20Z"
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()

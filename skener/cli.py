@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import io
 import json
 import logging
 import sys
@@ -36,6 +37,10 @@ primeri:
 # Logovanje (§11.3): JSON linije na stderr, polje `domain` u svakom zapisu
 # --------------------------------------------------------------------------- #
 class JsonLines(logging.Formatter):
+    # „Z" u vremenu tvrdi UTC; podrazumevano je lokalno vreme, pa bi van Docker-a svaki
+    # red bio pomeren za vremensku zonu mašine (BUG-012).
+    converter = time.gmtime
+
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ"),
@@ -75,24 +80,62 @@ def setup_logging(debug_domain: str | None) -> None:
 # --------------------------------------------------------------------------- #
 # Ulaz
 # --------------------------------------------------------------------------- #
+def _csv_tekst(path: Path) -> str:
+    """Excel bez opcije „CSV UTF-8" na srpskom Windows-u čuva u windows-1250."""
+    raw = Path(path).read_bytes()
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        log.warning("%s nije u UTF-8, čitam ga kao windows-1250", path)
+        return raw.decode("cp1250", errors="replace")
+
+
+def _razdvajac(zaglavlje: str) -> str:
+    """Srpska podešavanja Windows-a: Excel kolone razdvaja sa `;`, ne sa zarezom."""
+    return max(",;\t", key=zaglavlje.count) if any(c in zaglavlje for c in ",;\t") else ","
+
+
+def _ceo_broj(najmanje: int):
+    """Tip za argparse: ceo broj ≥ `najmanje`. Nula mesta u semaforu zaustavlja prolaz."""
+
+    def parse(tekst: str) -> int:
+        try:
+            broj = int(tekst)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"{tekst!r} nije ceo broj") from None
+        if broj < najmanje:
+            raise argparse.ArgumentTypeError(f"mora biti bar {najmanje}, a jeste {broj}")
+        return broj
+
+    return parse
+
+
 def read_domains(path: Path, only: Sequence[str] = ()) -> list[DomainInput]:
-    """CSV sa zaglavljem, ne gola lista domena (§4.1)."""
+    """CSV sa zaglavljem, ne gola lista domena (§4.1).
+
+    Lista najčešće dolazi iz Excel-a, pa se prepoznaju i `;` i windows-1250. Isti
+    domen dva puta znači dva prolaza kroz tuđ sajt — važi prvo pojavljivanje.
+    """
     rows: list[DomainInput] = []
-    with Path(path).open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if not reader.fieldnames or "domain" not in reader.fieldnames:
-            raise SystemExit(f"{path}: nedostaje kolona `domain` u zaglavlju (§4.1)")
-        for row in reader:
-            domain = (row.get("domain") or "").strip()
-            if not domain or domain.startswith("#"):
-                continue
-            industry = (row.get("industry") or "").strip().lower() or "ostalo"
-            if industry not in INDUSTRIES:
-                log.warning(
-                    "nepoznata delatnost %r, koristim `ostalo`", industry, extra={"domain": domain}
-                )
-                industry = "ostalo"
-            rows.append(DomainInput(domain=domain, industry=industry, note=(row.get("note") or "").strip()))
+    viđeni: set[str] = set()
+    tekst = _csv_tekst(path)
+    zaglavlje = tekst.splitlines()[0] if tekst.strip() else ""
+    reader = csv.DictReader(io.StringIO(tekst, newline=""), delimiter=_razdvajac(zaglavlje))
+    if not reader.fieldnames or "domain" not in reader.fieldnames:
+        raise SystemExit(f"{path}: nedostaje kolona `domain` u zaglavlju (§4.1)")
+    for row in reader:
+        domain = (row.get("domain") or "").strip()
+        if not domain or domain.startswith("#"):
+            continue
+        if domain.lower() in viđeni:
+            log.warning("domen se ponavlja u listi, preskačem ga", extra={"domain": domain})
+            continue
+        viđeni.add(domain.lower())
+        industry = (row.get("industry") or "").strip().lower() or "ostalo"
+        if industry not in INDUSTRIES:
+            log.warning("nepoznata delatnost %r, koristim `ostalo`", industry, extra={"domain": domain})
+            industry = "ostalo"
+        rows.append(DomainInput(domain=domain, industry=industry, note=(row.get("note") or "").strip()))
     if only:
         wanted = {d.lower() for d in only}
         rows = [r for r in rows if r.domain.lower() in wanted]
@@ -311,8 +354,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser("scan", help="pun prolaz nad listom domena")
     scan.add_argument("domains", metavar="DOMAINS.csv", help="CSV sa kolonama domain,industry,note")
     scan.add_argument("--level", choices=["1", "2", "auto"], default="auto", help="podrazumevano: auto")
-    scan.add_argument("--concurrency", type=int, metavar="N", help="globalni semafor (podrazumevano 8)")
-    scan.add_argument("--max-level2", type=int, metavar="N", help="gornji limit za nivo 2 (60)")
+    scan.add_argument(
+        "--concurrency", type=_ceo_broj(1), metavar="N", help="globalni semafor (podrazumevano 8)"
+    )
+    scan.add_argument("--max-level2", type=_ceo_broj(0), metavar="N", help="gornji limit za nivo 2 (60)")
     scan.add_argument(
         "--snapshots", metavar="DIR", help="gde se pišu snapshoti (podrazumevano: OUT/snapshots)"
     )

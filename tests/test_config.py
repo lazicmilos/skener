@@ -134,3 +134,49 @@ def test_identitet_od_samih_ne_ascii_znakova_puca(bez_okruzenja):
     cfg["identitet"] = {"naziv": "😀😀", "kontakt": "kontakt@primer.rs"}
     with pytest.raises(ConfigError, match="identitet"):
         user_agent(cfg)
+
+
+# --------------------------------------------------------------------------- #
+# Granica 0 u konfiguraciji: semafor sa nula mesta ne pušta nikog — prolaz bi
+# stajao zauvek, bez ijedne poruke.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "kljuc",
+    ["http.concurrency", "http.domain_concurrency", "browser.concurrency", "http.max_requests_per_domain"],
+)
+@pytest.mark.parametrize(
+    "vrednost, ispravna",
+    [
+        pytest.param(-1, False, id="nv-negativna"),
+        pytest.param(0, False, id="gv-0"),
+        pytest.param(1, True, id="gv-1"),
+    ],
+)
+def test_paralelizam_i_budzet_moraju_biti_pozitivni(tmp_path, kljuc, vrednost, ispravna):
+    sekcija, polje = kljuc.split(".")
+    override = tmp_path / "moj.toml"
+    override.write_text(f"[{sekcija}]\n{polje} = {vrednost}\n", encoding="utf-8")
+    if ispravna:
+        assert get(load_config(override), kljuc) == vrednost
+    else:
+        with pytest.raises(ConfigError, match=kljuc):
+            load_config(override)
+
+
+@pytest.mark.parametrize(
+    "vrednost, ispravna",
+    [
+        pytest.param(0, False, id="gv-0"),
+        pytest.param(-5, False, id="nv-negativna"),
+        pytest.param(0.5, True, id="gv-malo-iznad-0"),
+        pytest.param(40, True, id="ke-podrazumevana"),
+    ],
+)
+def test_vremenski_budzet_mora_biti_pozitivan(tmp_path, vrednost, ispravna):
+    override = tmp_path / "moj.toml"
+    override.write_text(f"[http]\nmax_seconds_per_domain = {vrednost}\n", encoding="utf-8")
+    if ispravna:
+        assert get(load_config(override), "http.max_seconds_per_domain") == vrednost
+    else:
+        with pytest.raises(ConfigError, match="max_seconds_per_domain"):
+            load_config(override)

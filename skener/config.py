@@ -116,6 +116,15 @@ def _merge(base: dict[str, Any], over: dict[str, Any]) -> None:
             base[key] = value
 
 
+# Nula mesta u semaforu ne pušta nikog: prolaz stoji zauvek, bez ijedne poruke (BUG-011).
+POZITIVNI_CELI = (
+    "http.concurrency",
+    "http.domain_concurrency",
+    "browser.concurrency",
+    "http.max_requests_per_domain",
+)
+
+
 def _validate(cfg: dict[str, Any]) -> None:
     for severity in ("critical", "high", "medium", "low"):
         if severity not in cfg.get("severity_points", {}):
@@ -127,3 +136,10 @@ def _validate(cfg: dict[str, Any]) -> None:
         for category in CATEGORIES:
             if category not in table[industry]:
                 raise ConfigError(f"industry_multipliers.{industry}.{category} nedostaje")
+    for dotted in POZITIVNI_CELI:
+        value = get(cfg, dotted)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ConfigError(f"{dotted} mora biti ceo broj ≥ 1, a jeste {value!r}")
+    seconds = get(cfg, "http.max_seconds_per_domain")
+    if isinstance(seconds, bool) or not isinstance(seconds, int | float) or seconds <= 0:
+        raise ConfigError(f"http.max_seconds_per_domain mora biti > 0, a jeste {seconds!r}")

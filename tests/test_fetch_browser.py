@@ -6,6 +6,7 @@ Označeno `browser`: preskače se ako Playwright ili Chromium nisu instalirani.
 from __future__ import annotations
 
 import asyncio
+import gzip
 import struct
 import zlib
 
@@ -117,6 +118,26 @@ def test_tezina_se_meri_iz_mreznog_saobracaja(snimak):
     assert snimak.network.request_count >= 4
     assert snimak.network.bytes_by_type.get("script", 0) > 250_000
     assert snimak.network.bytes_by_type.get("image", 0) > 0
+
+
+def test_tezina_broji_prenete_bajtove_a_ne_raspakovane():
+    """BUG-016: rečenica kaže „prenosi X MB", pa se broji ono što je stvarno preneto.
+
+    `response.body()` vraća raspakovano telo. JS i CSS putuju sažeti, pa je zbir za
+    sajtove sa mnogo skripti bio i nekoliko puta veći od stvarnog prenosa.
+    """
+    skripta = b"window.__x = '" + b"y" * 300_000 + b"';"
+    strana = b"<html><head><title>S</title></head><body><h1>S</h1><script src='/s.js'></script></body></html>"
+    with FakeSite(
+        extra={
+            "/": Response(strana),
+            "/s.js": Response(
+                skripta, headers={"content-type": "application/javascript", "content-encoding": "gzip"}
+            ),
+        }
+    ) as site:
+        snimak = snimi(site)
+    assert snimak.network.bytes_by_type["script"] == len(gzip.compress(skripta))
 
 
 def test_nemereni_odgovori_se_broje_a_ne_prećutkuju(snimak):

@@ -138,8 +138,9 @@ class _Recorder:
         size: int | None = 0 if status in BEZ_TELA else None
         if size is None:
             try:
-                # `response.body()` baca za odgovore iz keša i prekinute (§15, zamka 11).
-                size = len(await response.body())
+                # Preneti bajtovi, ne raspakovano telo: rečenica kaže „prenosi X MB", a JS i
+                # CSS putuju sažeti (BUG-016). Baca za odgovore iz keša i prekinute (§15, zamka 11).
+                size = (await response.request.sizes())["responseBodySize"]
             except Exception:  # noqa: BLE001
                 header = response.headers.get("content-length")
                 size = int(header) if header and header.isdigit() else None
@@ -157,7 +158,7 @@ class _Recorder:
     async def drain(self, timeout: float) -> None:
         """Telo koje ne stigne za `timeout` je nemereno, ne nula.
 
-        Strim ili video se ne završi nikad, a `response.body()` na njega čeka bez
+        Strim ili video se ne završi nikad, a merenje veličine na njega čeka bez
         kraja — na protetica.com je to zauvek blokiralo ceo prolaz.
         """
         if self._tasks:

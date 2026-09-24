@@ -35,6 +35,7 @@ from skener.models import (
 log = logging.getLogger("skener.browser")
 
 CONSOLE_SAMPLES = 5
+CLOSE_TIMEOUT_S = 10
 # Odgovori bez tela po definiciji — nisu „nemereni", njihova veličina je poznata i nula.
 BEZ_TELA = {204, 304}
 
@@ -153,9 +154,17 @@ class _Recorder:
         self.by_type[kind] = self.by_type.get(kind, 0) + size
         self.bytes_by_url[url] = size
 
-    async def drain(self) -> None:
+    async def drain(self, timeout: float) -> None:
+        """Telo koje ne stigne za `timeout` je nemereno, ne nula.
+
+        Strim ili video se ne završi nikad, a `response.body()` na njega čeka bez
+        kraja — na protetica.com je to zauvek blokiralo ceo prolaz.
+        """
         if self._tasks:
-            await asyncio.gather(*self._tasks, return_exceptions=True)
+            _done, pending = await asyncio.wait(self._tasks, timeout=timeout)
+            for task in pending:
+                task.cancel()
+                self.unmeasured += 1
             self._tasks.clear()
 
 
@@ -236,7 +245,7 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
         except PlaywrightError as exc:
             snapshot.errors.append(SnapshotError("scroll", type(exc).__name__, str(exc)[:200]))
 
-        await recorder.drain()
+        await recorder.drain(get(config, "browser.drain_timeout_s"))
         snapshot.timing = await _read_timing(page, reached, PlaywrightError)
         snapshot.dom = await _read_dom(page, recorder, config, PlaywrightError, snapshot)
         snapshot.network = NetworkStats(
@@ -255,7 +264,9 @@ async def capture(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnap
         snapshot.errors.append(SnapshotError("browser", type(exc).__name__, str(exc)[:300]))
         snapshot.status = "failed"
     finally:
-        await context.close()
+        # I zatvaranje ume da zaglavi; posle tvrdog limita ne sme da ga produži.
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(context.close(), CLOSE_TIMEOUT_S)
     return snapshot
 
 
@@ -307,6 +318,25 @@ async def _read_dom(
     )
 
 
+async def _capture_within_limit(browser: Any, site: SiteSnapshot, config: dict) -> BrowserSnapshot:
+    """Tvrd limit po domenu — poslednja odbrana od zastoja za koji još ne znamo.
+
+    Jedan domen koji visi ne sme da zaustavi ostalih 199 (§8.2).
+    """
+    limit_s = get(config, "browser.max_seconds_per_domain")
+    try:
+        return await asyncio.wait_for(capture(browser, site, config), limit_s)
+    except TimeoutError:
+        log.error("nivo 2 prekinut posle %s s", limit_s, extra={"domain": site.domain})
+        return BrowserSnapshot(
+            domain=site.domain,
+            url=(site.home.final_url if site.home else None) or "",
+            fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            status="failed",
+            errors=[SnapshotError("browser", "timeout", f"prekinut posle tvrdog limita od {limit_s} s")],
+        )
+
+
 def _launch_options(config: dict) -> dict[str, Any]:
     """Gotov Chromium umesto Playwright-ovog, kad ga okruženje već ima."""
     path = get(config, "browser.executable_path") or os.environ.get("SKENER_CHROMIUM", "")
@@ -334,7 +364,7 @@ async def capture_all(
             async def one(site: SiteSnapshot) -> tuple[str, BrowserSnapshot]:
                 async with limit:
                     log.info("nivo 2 počinje", extra={"domain": site.domain})
-                    snapshot = await capture(browser, site, config)
+                    snapshot = await _capture_within_limit(browser, site, config)
                     if snapshot_dir is not None:
                         store.write_browser(snapshot_dir, snapshot)
                     log.info(

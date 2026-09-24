@@ -408,7 +408,8 @@ def test_vreme_odgovora_ne_uključuje_pauzu_pristojnosti():
     čekao u redu, i gubi smisao zbog kog postoji (cdei.rs).
     """
     with FakeSite() as site:
-        snapshot = scan(site, **{"http.delay_ms": [300, 300], "http.max_requests_per_domain": 6})
+        # početna + robots + 2 mape + 2 sonde = 6; tek sedmi i osmi zahtev su uzorak
+        snapshot = scan(site, **{"http.delay_ms": [300, 300], "http.max_requests_per_domain": 8})
     uzorak = snapshot.pages[1:]
     assert uzorak, "uzorak mora da ima bar jednu stranicu"
     assert all(p.elapsed_ms < 250 for p in uzorak), [p.elapsed_ms for p in uzorak]
@@ -463,3 +464,39 @@ def test_tls_greska_ostaje_u_dokazu_i_kad_ponovni_dohvat_uspe():
     nalaz = run_level(1, snapshot)["infra.tls.invalid"]
     assert nalaz.status == "finding"
     assert "certificate has expired" in nalaz.findings[0].message_tech
+
+
+class YoastSajt(FakeSite):
+    """WordPress + Yoast: indeks sa devet mapa, svaka sa po nekoliko stranica.
+
+    Snimljeno na domaceizsrbije.rs (9 mapa) i cdei.rs (6): čitanje svih mapa
+    potroši budžet od 16 zahteva pre nego što sonde za lažni 404 dođu na red.
+    """
+
+    MAPE = 9
+
+    def route(self, path: str) -> Response:
+        base = self.base_url
+        if path == "/robots.txt":
+            return Response(f"User-agent: *\nSitemap: {base}/sitemap_index.xml\n".encode())
+        if path == "/sitemap_index.xml":
+            mape = "".join(f"<sitemap><loc>{base}/mapa-{i}.xml</loc></sitemap>" for i in range(self.MAPE))
+            return Response(f"<sitemapindex>{mape}</sitemapindex>".encode())
+        if path.startswith("/mapa-"):
+            i = path.removeprefix("/mapa-").removesuffix(".xml")
+            urls = "".join(f"<url><loc>{base}/grupa-{i}/strana-{j}</loc></url>" for j in range(3))
+            return Response(f"<urlset>{urls}</urlset>".encode())
+        if path.startswith("/grupa-"):
+            return Response(html(path))
+        return super().route(path)
+
+
+def test_velika_mapa_sajta_ne_pojede_sonde_za_lazni_404():
+    with YoastSajt() as site:
+        snapshot = scan(site)
+
+    assert snapshot.sitemap.nested_count == YoastSajt.MAPE
+    assert len(snapshot.soft404.probes) == 2, "sonde su ostale bez budžeta"
+    assert run_level(1, snapshot)["infra.soft404"].status == "ok"
+    assert len(snapshot.pages) >= 6, "uzorak mora i dalje da bude upotrebljiv"
+    assert not snapshot.budget.exhausted, snapshot.budget.aborted_reason

@@ -22,6 +22,9 @@ class Response:
     status: int = 200
     headers: dict[str, str] = field(default_factory=dict)
     delay: float = 0.0
+    # Zaglavlja i prvi bajt odmah, ostatak tek posle `stall` sekundi — kao strim ili
+    # video koji se nikad ne završi. `delay` je pre zaglavlja, ovo je posle njih.
+    stall: float = 0.0
 
 
 def html(title: str, *, body: str = "", head: str = "") -> bytes:
@@ -158,7 +161,14 @@ class FakeSite:
                     if "content-type" not in {k.lower() for k in headers}:
                         self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.end_headers()
+                    if response.stall:
+                        self.wfile.write(body[:1])
+                        self.wfile.flush()
+                        time.sleep(response.stall)
+                        body = body[1:]
                     self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # klijent je odustao usred odgovora — to je i poenta `stall`-a
                 finally:
                     with site._lock:
                         site._in_flight -= 1

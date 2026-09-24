@@ -89,7 +89,7 @@ def teski_sajt() -> FakeSite:
     )
 
 
-def snimi(site: FakeSite):
+def snimi(site: FakeSite, config: dict | None = None):
     from skener.fetch.browser import capture_all
 
     fake = SiteSnapshot(
@@ -97,7 +97,7 @@ def snimi(site: FakeSite):
         pages=[PageSnapshot(url=site.base_url + "/", final_url=site.base_url + "/", status=200)],
         entry=Entry(requested_url=site.base_url + "/", final_url=site.base_url + "/", status=200),
     )
-    return asyncio.run(capture_all([fake], load_config()))[site.base_url]
+    return asyncio.run(capture_all([fake], config or load_config()))[site.base_url]
 
 
 @pytest.fixture(scope="module")
@@ -186,6 +186,57 @@ def test_drugi_prolaz_meri_isto_jer_je_kes_prazan():
         drugi = snimi(site)
     assert drugi.network.total_bytes == pytest.approx(prvi.network.total_bytes, rel=0.02)
     assert drugi.network.unmeasured_responses == 0
+
+
+# --------------------------------------------------------------------------- #
+# Zastoji — snimljeno na protetica.com: jedan odgovor čije telo nikad ne stigne
+# je zauvek blokirao ceo prolaz. Sve ovde mora da se završi u roku.
+# --------------------------------------------------------------------------- #
+STRIM_STRANA = b"""<!doctype html><html lang="sr"><head><title>Strim</title></head>
+<body><h1>Strana sa strimom</h1><script>fetch('/strim').then(r => r.text())</script></body></html>"""
+
+
+def test_telo_koje_ne_stigne_je_nemereno_a_ne_zastoj():
+    """Strim ili video koji se ne završi: `load` stigne, telo odgovora nikad."""
+    import time
+
+    cfg = load_config()
+    cfg["browser"]["drain_timeout_s"] = 2
+    with FakeSite(
+        extra={
+            "/": Response(STRIM_STRANA),
+            "/strim": Response(b"x" * 10_000, headers={"content-type": "text/plain"}, stall=120),
+        }
+    ) as site:
+        started = time.monotonic()
+        snimak = snimi(site, cfg)
+        trajanje = time.monotonic() - started
+
+    assert trajanje < 20, f"nivo 2 je čekao telo strima {trajanje:.0f} s"
+    assert snimak.status == "ok"
+    assert snimak.dom.h1_count == 1, "ostatak merenja mora da preživi"
+    assert snimak.network.unmeasured_responses >= 1, "strim je nemeren, ne nula bajtova"
+
+
+def test_tvrdi_limit_po_domenu_prekida_nivo_2():
+    """Poslednja odbrana: bilo koji zastoj koji još ne znamo ne sme da zaustavi prolaz."""
+    import time
+
+    cfg = load_config()
+    cfg["browser"]["max_seconds_per_domain"] = 3
+    with FakeSite(
+        extra={
+            "/": Response(b"<html><h1>Spora</h1><img src='/spora.png'></html>"),
+            "/spora.png": Response(png(10, 10), headers={"content-type": "image/png"}, delay=30),
+        }
+    ) as site:
+        started = time.monotonic()
+        snimak = snimi(site, cfg)
+        trajanje = time.monotonic() - started
+
+    assert trajanje < 15, f"tvrdi limit od 3 s nije poštovan: {trajanje:.0f} s"
+    assert snimak.status == "failed"
+    assert any("tvrdog limita" in e.detail for e in snimak.errors), snimak.errors
 
 
 # --------------------------------------------------------------------------- #

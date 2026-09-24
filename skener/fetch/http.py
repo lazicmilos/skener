@@ -304,12 +304,14 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     allowed = [url for url in candidates if robots_parser.allows(rules, url)]
     sample = sitemap_parser.sample(base_url, allowed, get(cfg, "sitemap.sample_size"))
 
-    await _fetch_sample(fetcher, sample[1:], budget, snapshot, verify=verify, crawl_delay=crawl_delay)
-    # Sonde idu na poreklo, ne na putanju početne: `/index.php/<token>` na PHP-u
-    # vraća 200 preko PATH_INFO-a i daje lažni `infra.soft404` (§5.2).
+    # Sonde idu pre uzorka: dva zahteva za `high` nalaz. Posle uzorka ih velika mapa
+    # sajta (Yoast indeks sa 9 mapa) ostavi bez budžeta.
+    # Idu na poreklo, ne na putanju početne: `/index.php/<token>` na PHP-u vraća 200
+    # preko PATH_INFO-a i daje lažni `infra.soft404` (§5.2).
     await _probe_soft404(
         fetcher, domain, origin, budget, snapshot, verify=verify, crawl_delay=crawl_delay
     )
+    await _fetch_sample(fetcher, sample[1:], budget, snapshot, verify=verify, crawl_delay=crawl_delay)
 
     snapshot.budget = budget.snapshot()
     return snapshot

@@ -39,6 +39,9 @@ markers = [
 ]
 
 # Mutaciono testiranje (docs/plan-testiranja.md): moduli sa logikom, brzi testovi.
+# Nov modul pod skener/ je obuhvaćen sam, osim ako je u do_not_mutate. Zato čisti
+# moduli (poruke, diff, ishodi, klasifikacija adresa) ne idu u fetch/* ni report/*, a
+# njihovi testovi se dodaju u pytest_add_cli_args_test_selection.
 # Radi samo na Linux-u, pa kroz Docker:
 #   docker compose run --rm skener python scripts/mutacije.py
 [tool.mutmut]

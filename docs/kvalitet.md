@@ -90,7 +90,7 @@ sajta. Izuzetak je TLS nalaz. `tests/fixtures/` posle `record` sadrže javni HTM
 | ponovna upotrebljivost | nova provera = jedna funkcija sa dekoratorom | `@check(...)` u `checks/*.py` |
 | analizabilnost | `--debug-domain`, sirovi snapshoti na disku | `cli.setup_logging` |
 | izmenljivost | svi pragovi u `skener.toml`; `git diff` nad njim je istorija kalibracije | `test_config.py` |
-| testabilnost | preko 600 testova bez mreže, lokalni server umesto pravih sajtova; pokrivenost linija i grana 96 %, mutacioni skor 92 % | `tests/`, CI (`--cov-fail-under=92`), `[tool.mutmut]` |
+| testabilnost | preko 600 testova bez mreže, lokalni server umesto pravih sajtova; pokrivenost linija i grana 97 %, mutacioni skor 100 % neekvivalentnih | `tests/`, CI (`--cov-fail-under=95`), `[tool.mutmut]` |
 
 **Rupe.** `fetch/http.py` ima 550 linija i nosi četiri odgovornosti (klijent, budžet, sklapanje
 snapshota, orkestracija). Sva četiri baga iz revizije su bila tu. Kandidat za podelu u v2.

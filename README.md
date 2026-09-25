@@ -220,7 +220,7 @@ jednu stvar i proverava da nije probudio ostale provere. Pragovi imaju testove g
 je u imenu slučaja: `gv-` granična vrednost, `ke-` klasa ekvivalencije, `tab-` tabela odlučivanja,
 `st-` prelaz stanja, `pg-` pogađanje grešaka.
 
-CI pada ako pokrivenost linija i grana spadne ispod 92 % (sada je 97 %). Kvalitet samih testova
+CI pada ako pokrivenost linija i grana spadne ispod 95 % (sada je 97 %). Kvalitet samih testova
 meri mutaciono testiranje: mutmut namerno kvari kod, a testovi moraju da primete svaku izmenu koja
 menja ponašanje. Pokreće se kroz Docker, jer mutmut ne radi na Windows-u, i traje nekoliko minuta:
 

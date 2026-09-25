@@ -57,15 +57,30 @@ Sitemap: {base}/sitemap.xml
 """
 
 
+# Adrese lokalnih servera koji rade. `127.0.0.1` je privatna adresa i skener je ne otvara
+# (ADR-006), pa `conftest.py` dozvoljava tačno ove, a ne sve privatne adrese.
+ZIVI: set[FakeSite] = set()
+
+
+def dozvoljene_adrese() -> frozenset[tuple[str, int]]:
+    return frozenset(site.address for site in ZIVI)
+
+
 class FakeSite:
-    """Servira unapred pripremljene odgovore i broji šta je traženo."""
+    """Servira unapred pripremljene odgovore i broji šta je traženo.
+
+    `dozvoljen=False` pravi server koji skener ne sme da otvori: cilj preusmerenja ili
+    resursa u testovima zaštite od SSRF-a.
+    """
 
     def __init__(
         self,
         *,
         soft404: bool = False,
         extra: dict[str, Response | Callable[[], Response]] | None = None,
+        dozvoljen: bool = True,
     ) -> None:
+        self.dozvoljen = dozvoljen
         self.soft404 = soft404
         self.extra = extra or {}
         self.requests: list[str] = []
@@ -77,15 +92,23 @@ class FakeSite:
 
     # ------------------------------------------------------------------ server
     @property
-    def base_url(self) -> str:
+    def address(self) -> tuple[str, int]:
         host, port = self._server.server_address[:2]
+        return host, port
+
+    @property
+    def base_url(self) -> str:
+        host, port = self.address
         return f"http://{host}:{port}"
 
     def __enter__(self) -> FakeSite:
         self._thread.start()
+        if self.dozvoljen:
+            ZIVI.add(self)
         return self
 
     def __exit__(self, *_exc: object) -> None:
+        ZIVI.discard(self)
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=5)

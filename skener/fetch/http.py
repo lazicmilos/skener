@@ -21,9 +21,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpcore
 import httpx
 
-from skener import __version__, store
+from skener import __version__, addresses, store
 from skener.config import get, user_agent
 from skener.fetch import page as page_builder
 from skener.fetch import robots as robots_parser
@@ -115,6 +116,8 @@ def _classify(exc: Exception) -> tuple[str, str]:
         current = current.__cause__ or current.__context__
 
     for link in chain:
+        if isinstance(link, addresses.BlockedAddress):
+            return "blocked", str(link)
         if isinstance(link, socket.gaierror):
             return "dns", str(link)
         if isinstance(link, ssl.SSLCertVerificationError):
@@ -133,6 +136,53 @@ def _classify(exc: Exception) -> tuple[str, str]:
     if isinstance(exc, httpx.TooManyRedirects):
         return "too_many_redirects", str(exc)
     return "connection", f"{type(exc).__name__}: {exc}"
+
+
+async def _razresi(host: str, port: int) -> list[tuple]:
+    """DNS kroz petlju; testovi ga zamenjuju lažnim, da proveru ne rade nad pravim imenom."""
+    return await asyncio.get_running_loop().getaddrinfo(
+        host, port, type=socket.SOCK_STREAM, flags=socket.AI_ADDRCONFIG
+    )
+
+
+class _JavneAdrese(httpcore.AsyncNetworkBackend):
+    """Veza ide samo na adresu koja je prošla proveru (ADR-006).
+
+    Provera je posle DNS-a, na mestu gde se otvara TCP veza, i veza ide baš na proverenu
+    adresu. Tako je pokriveno svako preusmerenje, a DNS rebinding ne prolazi: ime koje se
+    između dva upita prebaci na privatnu adresu dobija vezu samo na onu proverenu. SNI i
+    `Host` i dalje nose ime domena, jer ih httpcore uzima iz zahteva, ne odavde.
+    """
+
+    def __init__(self, inner: httpcore.AsyncNetworkBackend, allowed: addresses.Allowlist) -> None:
+        self._inner = inner
+        self._allowed = allowed
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        try:
+            infos = await _razresi(host, port)
+        except OSError as exc:
+            raise httpcore.ConnectError(str(exc)) from exc
+        ips = list(dict.fromkeys(info[4][0] for info in infos))
+        javne = [ip for ip in ips if addresses.may_connect(ip, host, port, self._allowed)]
+        if not javne:
+            raise addresses.BlockedAddress(f"adresa nije javna: {host} → {', '.join(ips) or '—'}")
+        greska: Exception | None = None
+        for ip in javne:
+            try:
+                return await self._inner.connect_tcp(
+                    ip, port, timeout=timeout, local_address=local_address, socket_options=socket_options
+                )
+            except httpcore.ConnectError as exc:
+                greska = exc
+        raise greska  # type: ignore[misc]
 
 
 class Fetcher:
@@ -158,8 +208,19 @@ class Fetcher:
                 await client.aclose()
 
     def _make_client(self, *, verify: bool) -> httpx.AsyncClient:
+        transport = httpx.AsyncHTTPTransport(
+            verify=verify, limits=httpx.Limits(max_connections=get(self.config, "http.concurrency") * 2)
+        )
+        # httpx 0.28 nema javni parametar za mrežni backend. Ako se to polje preimenuje,
+        # zaštita ne sme tiho da nestane, pa alat tada odbija da radi.
+        pool = transport._pool
+        if not hasattr(pool, "_network_backend"):
+            raise RuntimeError("httpcore više nema _network_backend; SSRF zaštita ne može da se postavi")
+        pool._network_backend = _JavneAdrese(pool._network_backend, addresses.allowlist(self.config))
         return httpx.AsyncClient(
-            verify=verify,
+            transport=transport,
+            # Bez HTTP(S)_PROXY iz okruženja: proxy sam razrešava ime, pa bi zaobišao proveru.
+            trust_env=False,
             follow_redirects=True,
             headers={"User-Agent": user_agent(self.config)},
             timeout=httpx.Timeout(
@@ -167,7 +228,6 @@ class Fetcher:
                 connect=get(self.config, "http.timeout_connect_s"),
                 read=get(self.config, "http.timeout_read_s"),
             ),
-            limits=httpx.Limits(max_connections=get(self.config, "http.concurrency") * 2),
         )
 
     def _pick_client(self, *, verify: bool) -> httpx.AsyncClient:
@@ -267,11 +327,18 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
         fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         scanner_version=__version__,
     )
+    problem = addresses.input_problem(domain, addresses.allowlist(cfg))
+    if problem:
+        # Nijedan zahtev: IP adresa, port ili korisničko ime zaobilaze ime koje se proverava.
+        url = entry_candidates(domain)[0]
+        snapshot.entry = Entry(requested_url=url, error_kind="blocked", error_detail=problem)
+        snapshot.budget = budget.snapshot()
+        return snapshot
 
     entry_outcome, tls_error = await _fetch_entry(fetcher, domain, budget, snapshot)
     snapshot.entry = _entry_from(entry_outcome, tls_error)
     verify = tls_error is None
-    if entry_outcome.error_kind == "dns":
+    if entry_outcome.error_kind in {"dns", "blocked"}:
         snapshot.budget = budget.snapshot()
         return snapshot
 
@@ -329,7 +396,8 @@ def entry_candidates(domain: str) -> list[str]:
     """Adrese kojima se pokušava ulaz, redom.
 
     Domen sme da bude i pun origin (`http://localhost:8123`) — korisno za staging
-    sa portom, i jedini način da se fetcher testira protiv lokalnog servera.
+    sa portom, i jedini način da se fetcher testira protiv lokalnog servera. Port i
+    privatna adresa traže izričitu dozvolu u `[net] allowed_private` (ADR-006).
     """
     if "://" in domain:
         return [domain if domain.endswith("/") else f"{domain}/"]
@@ -354,7 +422,7 @@ async def _fetch_entry(
         retry = await fetcher.request(candidates[0], budget, verify=False)
         return (retry if retry.ok else outcome), outcome.error_detail or "nepoznata TLS greška"
 
-    if not outcome.ok and outcome.error_kind not in {"dns", "budget"} and len(candidates) > 1:
+    if not outcome.ok and outcome.error_kind not in {"dns", "budget", "blocked"} and len(candidates) > 1:
         snapshot.errors.append(SnapshotError("entry", outcome.error_kind or "?", outcome.error_detail or ""))
         fallback = await fetcher.request(candidates[1], budget)
         if fallback.ok:

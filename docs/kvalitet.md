@@ -76,6 +76,7 @@ Zrelost je nepoznata dok alat ne prođe bar jedan pravi prolaz.
 | Potkarakteristika | Kako | Dokaz |
 |---|---|---|
 | integritet | domen iz CSV-a ne može da izađe iz izlaznog foldera | `test_ime_direktorijuma_ne_izlazi_iz_izlaznog_foldera` |
+| poverljivost | privatne adrese se ne otvaraju, ni posle DNS-a ni posle preusmerenja (SSRF) | `test_ssrf.py`, `test_addresses.py`, [ADR-006](adr/ADR-006-ssrf.md) |
 | integritet | tuđ sadržaj je granica poverenja: prevelik sitemap se odbija, HTML sa sajta se escape-uje u izveštaju | `test_prevelik_sitemap_se_odbija`, `test_html_bezi_od_html_a_iz_sadrzaja_sajta` |
 | odgovornost | User-Agent nosi ime i kontakt operatera, ne autora; bez njih nema nijednog zahteva | `test_scan_bez_identiteta_odbija_pre_ijednog_zahteva` |
 | integritet | ime operatera ne može da ubaci novo HTTP zaglavlje | `test_identitet_ne_moze_da_ubaci_novo_zaglavlje` |

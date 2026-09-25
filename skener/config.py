@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from skener import __version__
+from skener.addresses import parse_allowed
 from skener.models import CATEGORIES, INDUSTRIES
 
 CONFIG_NAME = "skener.toml"
@@ -174,3 +175,10 @@ def _validate(cfg: dict[str, Any]) -> None:
     seconds = get(cfg, "http.max_seconds_per_domain")
     if isinstance(seconds, bool) or not isinstance(seconds, int | float) or seconds <= 0:
         raise ConfigError(f"http.max_seconds_per_domain mora biti > 0, a jeste {seconds!r}")
+    allowed = get(cfg, "net.allowed_private")
+    if not isinstance(allowed, list):
+        raise ConfigError(f"net.allowed_private mora biti lista \"host:port\" parova, a jeste {allowed!r}")
+    try:
+        parse_allowed(allowed)
+    except ValueError as exc:
+        raise ConfigError(f"net.allowed_private: {exc}") from None

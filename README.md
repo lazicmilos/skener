@@ -288,6 +288,25 @@ User-Agent predstavlja onoga ko pokreće alat, a ne autora alata.
   hosting, gde jedna strana odgovara i po tri sekunde. Broj zahteva je ostao isti.
 - Na `429` ili `503` alat odustaje od domena za taj prolaz, bez ponovnog pokušaja.
 
+### Privatne adrese se ne otvaraju
+
+Alat otvara samo javne adrese. `localhost`, `10.x`, `192.168.x`, `169.254.169.254` i ostale
+privatne i posebne adrese se ne otvaraju, ni kad do njih vodi javno ime posle DNS-a, ni posle
+preusmerenja. Domen sa IP adresom, portom ili korisničkim imenom ne dobija nijedan zahtev. Bez
+toga bi web aplikacija nad skenerom korisniku otvorila server iznutra (SSRF).
+
+Staging sa portom radi samo uz izričitu dozvolu u konfiguraciji:
+
+```toml
+[net]
+allowed_private = ["staging.primer.rs:8123"]
+```
+
+U browseru (nivo 2) zaštita ne vidi cilj preusmerenja ni WebSocket, pa web aplikacija u
+produkciji mora da ima i filter izlaznog saobraćaja na nivou mreže
+([ADR-006](docs/adr/ADR-006-ssrf.md)). Nivo 1 ne čita `HTTP(S)_PROXY` iz okruženja, jer bi
+proxy zaobišao proveru.
+
 ## Planirano, nije u v1
 
 - Kanonizacija hosta (sve četiri varijante `http/https` × `www/bez www`) kao podrazumevana provera.

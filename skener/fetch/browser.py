@@ -15,12 +15,14 @@ import contextlib
 import gc
 import logging
 import os
+import socket
 from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from skener import __version__, store
+from skener import __version__, addresses, store
 from skener.config import get, user_agent
 from skener.models import (
     BrowserSnapshot,
@@ -242,8 +244,11 @@ async def capture(
         device_scale_factor=1,
         user_agent=user_agent(config),
         ignore_https_errors=True,  # nevalidan sertifikat je nalaz nivoa 1, ne razlog da nivo 2 stane
+        # `route` ne vidi zahteve koje šalje service worker (ADR-006).
+        service_workers="block",
     )
     try:
+        await context.route("**/*", _cuvar(addresses.allowlist(config), PlaywrightError))
         page = await context.new_page()
         page.on("request", recorder.on_request)
         page.on("response", recorder.on_response)
@@ -394,6 +399,44 @@ def _tiho_za_zatvoren_kontekst(prethodni: Callable | None) -> Callable:
             loop.default_exception_handler(context)
 
     return handler
+
+
+def _cuvar(allowed: addresses.Allowlist, error_type: type) -> Any:
+    """Svaki zahtev browsera prolazi istu proveru adrese kao nivo 1 (ADR-006).
+
+    Chromium sam razrešava ime, pa između ove provere i njegove veze postoji prozor, a
+    WebSocket i preusmerenja `route` ne vidi. Zato produkcija dodaje i filter izlaznog
+    saobraćaja na nivou mreže; ovo je prva linija, ne jedina.
+    """
+    presude: dict[tuple[str, int], bool] = {}
+
+    async def handler(route: Any) -> None:
+        parts = urlsplit(route.request.url)
+        dozvoljeno = False
+        if parts.scheme in ("http", "https") and parts.hostname:
+            port = parts.port or (443 if parts.scheme == "https" else 80)
+            kljuc = (parts.hostname, port)
+            if kljuc not in presude:
+                presude[kljuc] = await _sve_adrese_dozvoljene(parts.hostname, port, allowed)
+            dozvoljeno = presude[kljuc]
+        # Posle tvrdog limita kontekst je zatvoren, pa ni odgovor ruti nema kome da ode.
+        with contextlib.suppress(error_type):
+            if dozvoljeno:
+                await route.continue_()
+            else:
+                await route.abort("blockedbyclient")
+
+    return handler
+
+
+async def _sve_adrese_dozvoljene(host: str, port: int, allowed: addresses.Allowlist) -> bool:
+    """Chromium bira adresu sam, pa sme samo ako su dozvoljene sve. Neuspeo DNS = ne."""
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        return False
+    ips = {info[4][0] for info in infos}
+    return bool(ips) and all(addresses.may_connect(ip, host, port, allowed) for ip in ips)
 
 
 def _launch_options(config: dict) -> dict[str, Any]:

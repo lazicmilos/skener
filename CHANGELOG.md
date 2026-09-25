@@ -19,6 +19,9 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   `greske_tekst`, `kopije`, `stranice`, `naslovi` i `od_slika`. `uzorak` je kod (`sitemap`,
   `links`, `none`), nedostajuće kodiranje je `null` umesto „nema", a `lanac` preusmerenja je
   lista URL-ova umesto teksta sa strelicama.
+- Privatne i posebne adrese se više ne otvaraju (SSRF, [ADR-006](docs/adr/ADR-006-ssrf.md)).
+  Domen sa IP adresom, portom ili korisničkim imenom je `failed` bez ijednog zahteva, osim kad je
+  `host:port` naveden u `[net] allowed_private`. Nivo 1 više ne čita `HTTP(S)_PROXY`.
 - `CheckSpec` više nema šablone `message_template` i `tech_template`, a `check()` ne prima
   `message` ni `tech`. Modul `skener.checks.srpski` je prešao u `skener.messages.sr`.
 

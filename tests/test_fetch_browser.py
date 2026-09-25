@@ -397,9 +397,12 @@ def test_stranica_koja_se_ne_otvara_je_failed_sa_razlogom():
         pages=[PageSnapshot(url="http://127.0.0.1:1/", final_url="http://127.0.0.1:1/", status=200)],
         entry=Entry(requested_url="http://127.0.0.1:1/", final_url="http://127.0.0.1:1/", status=200),
     )
-    snimak = asyncio.run(capture_all([mrtav], load_config()))["http://127.0.0.1:1"]
+    cfg = load_config()
+    cfg["net"]["allowed_private"] = ["127.0.0.1:1"]  # da pukne odbijena veza, a ne zaštita adresa
+    snimak = asyncio.run(capture_all([mrtav], cfg))["http://127.0.0.1:1"]
     assert snimak.status == "failed"
     assert snimak.errors and snimak.errors[0].stage == "goto"
+    assert "ERR_BLOCKED_BY_CLIENT" not in snimak.errors[0].detail
 
 
 def test_sistemski_chromium_iz_konfiguracije_i_okruzenja(monkeypatch):

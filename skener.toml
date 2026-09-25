@@ -24,6 +24,13 @@ max_seconds_per_domain = 40     # tvrd budžet (§4.2); 25 s nije bilo dovoljno 
 max_crawl_delay_s = 10          # Crawl-delay se poštuje do ove granice (§8.3)
 user_agent = "MlazicSiteScanner/{verzija} (+{kontakt}; {naziv})"   # popunjava se iz [identitet]
 
+[net]
+# Privatne i posebne adrese (localhost, 10.x, 192.168.x, 169.254.x…) se ne otvaraju, ni
+# posle DNS-a ni posle preusmerenja (SSRF, docs/adr/ADR-006-ssrf.md). Ovde idu samo
+# `host:port` parovi koji se izričito dozvoljavaju, npr. ["localhost:8123"] za staging.
+# Opšti prekidač koji isključuje zaštitu ne postoji.
+allowed_private = []
+
 [sitemap]
 max_depth = 3
 max_files = 4                   # 16 = početna 1 + robots 1 + sonde 2 + mape 4 + uzorak 7 (+1 rezerva);

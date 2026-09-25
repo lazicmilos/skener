@@ -51,7 +51,7 @@ markers = [
 [tool.mutmut]
 paths_to_mutate = ["skener/"]
 do_not_mutate = [
-    "skener/__init__.py", "skener/cli.py", "skener/models.py", "skener/store.py",
+    "skener/__init__.py", "skener/cli.py", "skener/pipeline.py", "skener/models.py", "skener/store.py",
     "skener/fetch/*", "skener/report/*",
 ]
 tests_dir = ["tests/"]
@@ -59,6 +59,7 @@ also_copy = ["skener.toml"]
 pytest_add_cli_args_test_selection = [
     "tests/test_checks_level1.py", "tests/test_checks_level2.py", "tests/test_granice.py",
     "tests/test_score.py", "tests/test_config.py", "tests/test_ispitni_skup.py", "tests/test_poruke.py",
+    "tests/test_inputs.py", "tests/test_addresses.py",
 ]
 
 [tool.ruff]

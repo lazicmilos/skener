@@ -55,9 +55,12 @@ Nivo 2 je prva linija odbrane, a ne jedina:
 
 Nivo 2 ide samo na domene koji su prošli nivo 1, pa napadač mora da kontroliše javni sajt.
 Web aplikacija u produkciji zato mora da ima i **filter izlaznog saobraćaja na nivou mreže**
-(egress): radni proces sme da otvara samo javne adrese. Alternativa u samom alatu je lokalni
-proxy za Chromium koji proverava svaku vezu, uključujući preusmerenja i WebSocket. Odluka o
-tome ostaje za web fazu.
+(egress): radni proces sme da otvara samo javne adrese.
+
+**Odluka vlasnika (25.09.2026.):** ograničenja nivoa 2 rešava filter izlaznog saobraćaja u web
+fazi, kao obavezan deo produkcije. Lokalni proxy za Chromium, koji bi u samom alatu proveravao
+svaku vezu, uključujući preusmerenja i WebSocket, ne pravi se: to je ozbiljan posao i menja
+merenje vremena, a filter na nivou mreže pokriva sve tri rupe odjednom.
 
 ## Posledice
 

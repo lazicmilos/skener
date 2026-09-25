@@ -280,11 +280,13 @@ class Finding:
     level: int
     category: str
     severity: str
-    message_client: str
-    message_tech: str
+    # Samo podaci: brojevi, logičke vrednosti, URL-ovi, tehnički kodovi, sirove greške i
+    # tekst sa sajta. Rečenicu pravi `skener.messages` pri prikazu, na jeziku izveštaja.
     evidence: dict[str, Any] = field(default_factory=dict)
     evidence_urls: list[str] = field(default_factory=list)
     weight: float = 0.0
+    # Kad provera ima više oblika rečenice, npr. težina sa videom i bez njega.
+    variant: str | None = None
 
 
 @dataclass

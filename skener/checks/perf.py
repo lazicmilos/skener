@@ -7,7 +7,6 @@ ozbiljnošću koja važi — ne tri nalaza za istu stranicu (§7.3).
 from __future__ import annotations
 
 from skener.checks.registry import Context, check, finding, ok, unknown
-from skener.checks.srpski import decimalni, sa_brojem
 from skener.models import SiteSnapshot
 
 COMPRESSED = {"gzip", "br", "zstd", "deflate"}
@@ -44,12 +43,6 @@ def _seconds_on_mobile(mb: float, ctx: Context) -> float:
     requires=["home"],
     description="Server ne šalje HTML kompresovan.",
     threshold="content-encoding ∉ {gzip, br, zstd, deflate} i HTML > 50 kB",
-    message=(
-        "Server šalje stranicu nesažetu ({kb} kB). Sažimanje bi prenos smanjilo na otprilike "
-        "četvrtinu, što na sporijoj mobilnoj vezi ({brzina} Mb/s) skraćuje učitavanje za oko "
-        "{usteda_s} s."
-    ),
-    tech="content-encoding={kodiranje}, html_bytes={bajtova} (dekodirano), ušteda ≈ {usteda_s} s",
 )
 def compression_missing(snapshot: SiteSnapshot, ctx: Context):
     home = snapshot.home
@@ -61,7 +54,7 @@ def compression_missing(snapshot: SiteSnapshot, ctx: Context):
         compression_missing.spec,
         ctx,
         evidence={
-            "kodiranje": encoding or "nema",
+            "kodiranje": encoding or None,
             "bajtova": home.html_bytes,
             "kb": round(home.html_bytes / 1024),
             # gzip i br svode HTML na otprilike četvrtinu; ušteda je ostatak, na sporijoj vezi
@@ -80,11 +73,6 @@ def compression_missing(snapshot: SiteSnapshot, ctx: Context):
     requires=["entry_response"],
     description="Početna se otvara kroz niz preusmerenja.",
     threshold="broj skokova ≥ thresholds.perf.redirect_hops (3)",
-    message=(
-        "Otvaranje početne strane prolazi kroz {skokova} preusmerenja pre nego što se nešto "
-        "prikaže. Svako od njih dodaje čekanje, najviše na mobilnoj vezi."
-    ),
-    tech="redirect_chain={skokova} skokova: {lanac}",
 )
 def redirect_chain(snapshot: SiteSnapshot, ctx: Context):
     chain = snapshot.entry.redirect_chain
@@ -94,7 +82,7 @@ def redirect_chain(snapshot: SiteSnapshot, ctx: Context):
     return finding(
         redirect_chain.spec,
         ctx,
-        evidence={"skokova": hops, "lanac": " → ".join(chain)},
+        evidence={"skokova": hops, "lanac": chain},
         urls=chain[:1],
     )
 
@@ -107,11 +95,6 @@ def redirect_chain(snapshot: SiteSnapshot, ctx: Context):
     requires=["home"],
     description="Sam HTML dokument je prevelik.",
     threshold="html_bytes > thresholds.perf.html_size_kb (500 kB)",
-    message=(
-        "Sam kod početne strane teži {kb} kB, pre slika i skripti. Pretraživač mora sve to "
-        "da preuzme i obradi, što usporava prikaz, najviše na telefonu."
-    ),
-    tech="html_bytes={bajtova} > {prag_kb} kB",
 )
 def html_size(snapshot: SiteSnapshot, ctx: Context):
     home = snapshot.home
@@ -137,14 +120,6 @@ def html_size(snapshot: SiteSnapshot, ctx: Context):
     requires=["network"],
     description="Ukupna težina početne strane.",
     threshold="preneto, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical",
-    message=(
-        "Početna strana prenosi {mb} MB{uz_video}. Na sporijoj mobilnoj vezi ({brzina} Mb/s) za "
-        "to je potrebno oko {sekundi} s, a mnogi posetioci ne čekaju toliko."
-    ),
-    tech=(
-        "total_bytes={bajtova}, bez videa {mb} MB, video {video_mb} MB, zahteva={zahteva}, "
-        "nemereno={nemereno}, reached={reached}"
-    ),
 )
 def page_weight(snapshot, ctx: Context):
     network = snapshot.network
@@ -174,7 +149,6 @@ def page_weight(snapshot, ctx: Context):
             "bajtova": network.total_bytes,
             "mb": round(mb, 1),
             "video_mb": video_mb,
-            "uz_video": f" (video dodatno {decimalni(video_mb)} MB)" if video else "",
             "sekundi": _seconds_on_mobile(mb, ctx),
             "brzina": ctx.th("thresholds.perf.mobile_speed_mbps"),
             "zahteva": network.request_count,
@@ -183,6 +157,7 @@ def page_weight(snapshot, ctx: Context):
             "po_tipu": network.bytes_by_type,
         },
         urls=[snapshot.url],
+        variant="video" if video else None,
     )
 
 
@@ -194,11 +169,6 @@ def page_weight(snapshot, ctx: Context):
     requires=["network"],
     description="Broj mrežnih zahteva pri otvaranju početne.",
     threshold="> 100 medium · > 150 high",
-    message=(
-        "Otvaranje početne strane pokreće {preuzimanja}. Svako ima svoju "
-        "režiju, što se najviše oseti na mobilnoj vezi."
-    ),
-    tech="request_count={zahteva} (reached={reached})",
 )
 def request_count(snapshot, ctx: Context):
     count = snapshot.network.request_count
@@ -213,9 +183,6 @@ def request_count(snapshot, ctx: Context):
         severity=severity,
         evidence={
             "zahteva": count,
-            "preuzimanja": sa_brojem(
-                count, "odvojeno preuzimanje", "odvojena preuzimanja", "odvojenih preuzimanja"
-            ),
             "reached": snapshot.timing.reached,
         },
         urls=[snapshot.url],
@@ -230,11 +197,6 @@ def request_count(snapshot, ctx: Context):
     requires=["browser"],
     description="Vreme do potpunog učitavanja početne.",
     threshold="> 4 s medium · > 8 s high · prekid posle tvrdog limita = high",
-    message=(
-        "Početnoj strani treba {sekundi} s da se do kraja učita. Mnogi posetioci ne čekaju "
-        "toliko, naročito na telefonu."
-    ),
-    tech="load_ms={load_ms}, reached={reached}",
 )
 def load_time(snapshot, ctx: Context):
     timing = snapshot.timing
@@ -274,11 +236,6 @@ def load_time(snapshot, ctx: Context):
     requires=["browser"],
     description="Slike se šalju znatno veće nego što se prikazuju.",
     threshold="≥ 3 slike sa odnosom > 2,5 ili procenjen višak > 700 kB",
-    message=(
-        "Sajt šalje slike znatno veće nego što se prikazuju — oko {kb} kB nepotrebnog prenosa "
-        "pri prvoj poseti."
-    ),
-    tech="{broj_slika} slika sa ratio > {prag_odnosa}, procenjen višak {kb} kB, nemereno {nemereno}",
 )
 def img_oversized(snapshot, ctx: Context):
     dom = snapshot.dom
@@ -317,11 +274,6 @@ def img_oversized(snapshot, ctx: Context):
     requires=["browser"],
     description="JavaScript greške u konzoli.",
     threshold="> thresholds.qa.console_errors (3)",
-    message=(
-        "Na početnoj strani ima {greske_tekst}. Deo stranice zato možda ne "
-        "radi kako treba."
-    ),
-    tech="console errors={greske}, warnings={upozorenja}",
 )
 def console_errors(snapshot, ctx: Context):
     # Slab prodajni signal — zato ostaje `low` i ne ide u mejl (§15, zamka 9).
@@ -333,9 +285,6 @@ def console_errors(snapshot, ctx: Context):
         ctx,
         evidence={
             "greske": console.errors,
-            "greske_tekst": sa_brojem(
-                console.errors, "JavaScript grešku", "JavaScript greške", "JavaScript grešaka"
-            ),
             "upozorenja": console.warnings,
             "primer": console.samples[0] if console.samples else None,
         },

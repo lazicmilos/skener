@@ -1,0 +1,93 @@
+"""Nalazi nad kojima se proveravaju rečenice: ispitni skup i po jedan pokvaren slučaj za svaku
+proveru, uz slučajeve koji menjaju oblik rečenice (video, prekid učitavanja, množina).
+
+Golden fajl `tests/golden/poruke-sr.json` napravljen je iz ovih nalaza pre nego što su poruke
+izdvojene iz provera. Kad izmena rečenice u F2 bude namerna, golden se pravi ponovo i razlika
+je vidljiva u `git diff`-u.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
+
+from factories import clean_browser, clean_site, run_level
+from test_checks_level1 import POZITIVNI as NIVO1
+from test_checks_level2 import POZITIVNI as NIVO2
+from test_ispitni_skup import spec_config
+
+from skener import store
+from skener.checks import registry
+from skener.config import load_config
+from skener.models import Finding
+from skener.score import analyze
+
+FIXTURES = Path(__file__).parent / "fixtures"
+GOLDEN = Path(__file__).parent / "golden" / "poruke-sr.json"
+
+
+def _isti(site: Any, polje: str, broj: int) -> None:
+    for i, page in enumerate(site.pages[:broj]):
+        setattr(page, polje, "Ista vrednost na više stranica")
+        page.final_url = "https://cist.rs/" if i == 0 else f"https://cist.rs/g{i}/strana"
+
+
+def _browser(izmena: Callable[[Any], None]) -> Any:
+    browser = clean_browser()
+    izmena(browser)
+    return browser
+
+
+def _site(izmena: Callable[[Any], None]) -> Any:
+    site = clean_site()
+    izmena(site)
+    return site
+
+
+def _nalazi(level: int, snapshot: Any, industry: str = "ostalo") -> list[Finding]:
+    return [f for result in run_level(level, snapshot, industry).values() for f in result.findings]
+
+
+def slucajevi() -> Iterator[tuple[str, Finding]]:
+    registry.load_all()
+    for naziv, config in (("spec", spec_config()), ("toml", load_config())):
+        for site, browser in store.read_all(FIXTURES):
+            for f in analyze(site, config, browser=browser).findings:
+                yield f"ispitni/{naziv}/{site.domain}", f
+
+    for check_id, pokvari in sorted(NIVO1.items()):
+        yield from ((f"nivo1/{check_id}", f) for f in _nalazi(1, _site(pokvari)))
+    for check_id, pokvari in sorted(NIVO2.items()):
+        yield from ((f"nivo2/{check_id}", f) for f in _nalazi(2, _browser(pokvari)))
+
+    def video(b: Any) -> None:
+        b.network.total_bytes = 30_000_000
+        b.network.bytes_by_type = {"media": 8_000_000, "image": 22_000_000}
+
+    def prekid(b: Any) -> None:
+        b.timing.reached = "timeout"
+        b.timing.load_ms = None
+
+    def kompresija(s: Any) -> None:
+        s.home.headers = {}
+        s.home.html_bytes = 80_000
+
+    posebni: list[tuple[str, int, Any]] = [
+        ("video", 2, _browser(video)),
+        ("prekid-ucitavanja", 2, _browser(prekid)),
+        ("kompresija-80kB", 1, _site(kompresija)),
+    ]
+    for broj in (4, 5, 21):
+        posebni.append((f"h1-{broj}", 2, _browser(lambda b, n=broj: setattr(b.dom, "h1_count", n))))
+    for broj in (4, 7, 21):
+        posebni.append((f"konzola-{broj}", 2, _browser(lambda b, n=broj: setattr(b.console, "errors", n))))
+    for broj in (101, 102, 150):
+        posebni.append(
+            (f"zahtevi-{broj}", 2, _browser(lambda b, n=broj: setattr(b.network, "request_count", n)))
+        )
+    for broj in (3, 5):
+        posebni.append((f"naslov-{broj}", 1, _site(lambda s, n=broj: _isti(s, "title", n))))
+        posebni.append((f"opis-{broj}", 1, _site(lambda s, n=broj: _isti(s, "meta_description", n))))
+    for naziv, level, snapshot in posebni:
+        yield from ((f"posebno/{naziv}", f) for f in _nalazi(level, snapshot))

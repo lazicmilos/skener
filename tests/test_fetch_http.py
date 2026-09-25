@@ -27,6 +27,7 @@ from skener.fetch.http import (
     probe_urls,
     scan_domains,
 )
+from skener.messages import render
 from skener.models import DomainInput
 
 
@@ -471,7 +472,7 @@ def test_tls_greska_ostaje_u_dokazu_i_kad_ponovni_dohvat_uspe():
     assert snapshot.entry.tls.error == "certificate has expired"
     nalaz = run_level(1, snapshot)["infra.tls.invalid"]
     assert nalaz.status == "finding"
-    assert "certificate has expired" in nalaz.findings[0].message_tech
+    assert "certificate has expired" in render(nalaz.findings[0]).tech
 
 
 class YoastSajt(FakeSite):

@@ -7,6 +7,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from skener.messages import render
 from skener.models import DomainReport
 
 FINDINGS_HEADER = [
@@ -38,7 +39,9 @@ SUMMARY_HEADER = [
 ]
 
 
-def write_findings(path: Path, reports: Sequence[DomainReport], *, bom: bool = False) -> Path:
+def write_findings(
+    path: Path, reports: Sequence[DomainReport], *, bom: bool = False, lang: str = "sr"
+) -> Path:
     rows = [
         [
             report.domain,
@@ -49,7 +52,7 @@ def write_findings(path: Path, reports: Sequence[DomainReport], *, bom: bool = F
             finding.category,
             finding.severity,
             finding.weight,
-            finding.message_client,
+            render(finding, lang).client,
             json.dumps(finding.evidence, ensure_ascii=False),
             finding.evidence_urls[0] if finding.evidence_urls else "",
             report.scanned_at,

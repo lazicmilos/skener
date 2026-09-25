@@ -65,8 +65,6 @@ def test_ok_sa_nalazom_je_bug():
         level=1,
         category="seo",
         severity="high",
-        message_client="x",
-        message_tech="y",
     )
     with pytest.raises(ValueError, match="status nije"):
         CheckResult(check_id="seo.title.missing", status="ok", findings=[finding])

@@ -32,8 +32,6 @@ def nalaz(check_id: str, category: str, severity: str, level: int = 1) -> CheckR
                 level=level,
                 category=category,
                 severity=severity,
-                message_client="rečenica za klijenta",
-                message_tech="tehnički opis",
                 evidence={"broj": 1},
             )
         ],

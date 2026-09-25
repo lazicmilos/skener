@@ -18,6 +18,7 @@ from skener import __version__, pipeline
 from skener.checks import registry
 from skener.config import ConfigError, load_config
 from skener.inputs import InputError, read_domain_list
+from skener.messages import LANGS, catalog, templates
 from skener.models import DomainInput, Event, ScanResult
 from skener.report import csv_out, html_out
 
@@ -149,10 +150,12 @@ def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
     formats = {f.strip() for f in args.format.split(",") if f.strip()}
 
     if "csv" in formats:
-        csv_out.write_findings(out / "findings.csv", reports, bom=args.csv_bom)
+        csv_out.write_findings(out / "findings.csv", reports, bom=args.csv_bom, lang=args.lang)
         csv_out.write_summary(out / "summary.csv", reports, bom=args.csv_bom)
     if "html" in formats:
-        html_out.write(out / "index.html", reports, config, duration_s=result.duration_s["total"])
+        html_out.write(
+            out / "index.html", reports, config, duration_s=result.duration_s["total"], lang=args.lang
+        )
 
     nalaza = sum(len(r.findings) for r in reports)
     print(f"\n{len(reports)} domena · {nalaza} nalaza · izlaz u {out}/", file=sys.stderr)
@@ -221,11 +224,13 @@ def cmd_explain(args: argparse.Namespace) -> int:
     print(f"ozbiljnost:  {spec.base_severity}")
     print(f"prag:        {spec.threshold}")
     print(f"traži:       {', '.join(spec.requires) or '—'}")
-    print(f"\n{spec.description}\n")
-    print("rečenica za klijenta:")
-    print(f"  {spec.message_template}")
-    print("\ntehnička formulacija:")
-    print(f"  {spec.tech_template}")
+    print(f"\n{spec.description}")
+    for lang in LANGS:
+        client, tech = templates(spec.check_id, lang)
+        print(f"\nrečenica za klijenta ({lang}):\n  {client}")
+        print(f"tehnička formulacija ({lang}):\n  {tech}")
+        for variant in catalog(lang).FINDINGS[spec.check_id].get("variants", {}):
+            print(f"varijanta {variant} ({lang}):\n  {templates(spec.check_id, lang, variant)[0]}")
     return 0
 
 
@@ -249,6 +254,9 @@ def build_parser() -> argparse.ArgumentParser:
             "--format", default="html,csv", help="html, csv ili oba (podrazumevano: html,csv)"
         )
         sub.add_argument("--csv-bom", action="store_true", help="UTF-8 sa BOM-om, za Excel")
+        sub.add_argument(
+            "--lang", choices=LANGS, default="sr", help="jezik rečenica i izveštaja (podrazumevano: sr)"
+        )
         sub.add_argument("--debug-domain", metavar="DOMAIN", help="DEBUG log samo za taj domen")
 
     scan = subparsers.add_parser("scan", help="pun prolaz nad listom domena")

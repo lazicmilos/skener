@@ -20,6 +20,7 @@ import pytest
 from skener import store
 from skener.checks import registry
 from skener.config import load_config
+from skener.messages import LANGS, render
 from skener.models import SEVERITY_ORDER
 from skener.score import analyze, escalation_reasons, rank
 
@@ -106,7 +107,8 @@ def test_svaki_nalaz_ima_dokaz_i_recenicu(domain, izvestaji):
     for finding in izvestaji[domain].findings:
         assert finding.evidence, f"{finding.check_id}: nalaz bez dokaza (§3.5)"
         assert finding.weight > 0, f"{finding.check_id}: nalaz bez bodova"
-        assert "{" not in finding.message_client, "rečenica nije popunjena vrednostima"
+        for lang in LANGS:
+            assert "{" not in render(finding, lang).client, "rečenica nije popunjena vrednostima"
 
 
 # --------------------------------------------------------------------------- #

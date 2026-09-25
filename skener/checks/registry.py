@@ -15,7 +15,6 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from skener.checks.srpski import decimalni
 from skener.config import get
 from skener.models import CheckResult, Finding
 
@@ -42,8 +41,6 @@ class CheckSpec:
     category: str
     base_severity: str
     requires: tuple[str, ...]
-    message_template: str
-    tech_template: str
     description: str
     threshold: str
     fn: CheckFn
@@ -59,8 +56,6 @@ def check(
     level: int,
     category: str,
     base_severity: str,
-    message: str,
-    tech: str,
     description: str,
     threshold: str,
     requires: Iterable[str] = (),
@@ -75,8 +70,6 @@ def check(
             category=category,
             base_severity=base_severity,
             requires=tuple(requires),
-            message_template=message,
-            tech_template=tech,
             description=description,
             threshold=threshold,
             fn=fn,
@@ -102,18 +95,6 @@ def unknown(spec: CheckSpec, reason: str) -> CheckResult:
     return CheckResult(check_id=spec.check_id, status="unknown", reason=reason)
 
 
-def _za_citanje(evidence: dict[str, Any]) -> dict[str, Any]:
-    """Srpski zapis broja u rečenici: decimalni zarez, bez „,0" — „14,9 MB", „22 MB".
-
-    Menja se samo zapis u rečenici za klijenta; dokaz ostaje broj, a tehnički opis
-    ostaje sa tačkom (BUG-015).
-    """
-    return {
-        key: decimalni(value) if isinstance(value, float) else value
-        for key, value in evidence.items()
-    }
-
-
 def finding(
     spec: CheckSpec,
     ctx: Context,
@@ -121,8 +102,9 @@ def finding(
     evidence: dict[str, Any],
     urls: Iterable[str] = (),
     severity: str | None = None,
+    variant: str | None = None,
 ) -> CheckResult:
-    """Rečenice se formatiraju **iz dokaza**.
+    """Nalaz nosi dokaz, a rečenicu iz njega pravi `skener.messages` pri prikazu.
 
     To nije stil nego tvrdnja: ako rečenica za klijenta sadrži broj, taj broj
     nužno postoji u `evidence`. „Sajt je spor" tako ne može da prođe (§3.5).
@@ -137,10 +119,9 @@ def finding(
                 level=spec.level,
                 category=spec.category,
                 severity=severity or spec.base_severity,
-                message_client=spec.message_template.format(**_za_citanje(evidence)),
-                message_tech=spec.tech_template.format(**evidence),
                 evidence=evidence,
                 evidence_urls=[u for u in urls if u],
+                variant=variant,
             )
         ],
     )

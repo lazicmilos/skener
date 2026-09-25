@@ -16,13 +16,16 @@ from pathlib import Path
 
 from skener import __version__
 from skener.config import get
+from skener.messages import render as poruka
+from skener.messages import text
 from skener.models import DomainReport
 
+# Znak i boje po ozbiljnosti; oznaka („KRITIČNO") dolazi iz kataloga jezika.
 OZBILJNOST = {
-    "critical": ("KRITIČNO", "▲", "#7f1d1d", "#fee2e2"),
-    "high": ("VISOKO", "●", "#9a3412", "#ffedd5"),
-    "medium": ("SREDNJE", "◆", "#854d0e", "#fef9c3"),
-    "low": ("NISKO", "▪", "#1e3a8a", "#dbeafe"),
+    "critical": ("▲", "#7f1d1d", "#fee2e2"),
+    "high": ("●", "#9a3412", "#ffedd5"),
+    "medium": ("◆", "#854d0e", "#fef9c3"),
+    "low": ("▪", "#1e3a8a", "#dbeafe"),
 }
 
 CSS = """
@@ -72,12 +75,13 @@ footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--line);
 """
 
 JS = """
+const LABELS = __LABELS__;
 document.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-draft]');
   if (!button) return;
   const text = button.getAttribute('data-draft');
-  const done = () => { button.textContent = 'Kopirano ✓'; setTimeout(() => {
-    button.textContent = 'Kopiraj nacrt mejla'; }, 1800); };
+  const done = () => { button.textContent = LABELS.copied; setTimeout(() => {
+    button.textContent = LABELS.copy; }, 1800); };
   if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, fallback); }
   else fallback();
   function fallback() {
@@ -93,24 +97,27 @@ def _e(value: object) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
-def _badge(severity: str) -> str:
-    label, glyph, fg, bg = OZBILJNOST.get(severity, ("?", "?", "#374151", "#e5e7eb"))
+def _badge(severity: str, lang: str) -> str:
+    glyph, fg, bg = OZBILJNOST.get(severity, ("?", "#374151", "#e5e7eb"))
+    label = text(f"severity_{severity}", lang) if severity in OZBILJNOST else "?"
     return f'<span class="tag" style="color:{fg};background:{bg}">{glyph} {_e(label)}</span>'
 
 
-def email_draft(report: DomainReport) -> str:
+def email_draft(report: DomainReport, lang: str = "sr") -> str:
     """Tri rečenice od tri najteža nalaza — toliko staje u mejl (§9.4)."""
     if not report.findings:
-        return f"Na sajtu {report.domain} nisam našao značajnije probleme."
-    lines = [f"{i}. {f.message_client}" for i, f in enumerate(report.top_findings, start=1)]
-    return (
-        f"Poštovani,\n\npregledao sam sajt {report.domain} i primetio sledeće:\n\n"
-        + "\n\n".join(lines)
-        + "\n\nAko vas zanima, mogu da pošaljem detaljan pregled sa predlogom šta prvo popraviti.\n"
-    )
+        return text("draft_clean", lang, domain=report.domain)
+    lines = [f"{i}. {poruka(f, lang).client}" for i, f in enumerate(report.top_findings, start=1)]
+    opening = text("draft_opening", lang, domain=report.domain)
+    return opening + "\n\n".join(lines) + text("draft_closing", lang)
 
 
-def render(reports: Sequence[DomainReport], config: dict, *, duration_s: float | None = None) -> str:
+def render(
+    reports: Sequence[DomainReport], config: dict, *, duration_s: float | None = None, lang: str = "sr"
+) -> str:
+    def t(key: str, **values) -> str:
+        return _e(text(key, lang, **values))
+
     scanned = sum(1 for r in reports if r.status == "scanned")
     partial = sum(1 for r in reports if r.status == "partial")
     failed = sum(1 for r in reports if r.status == "failed")
@@ -118,113 +125,125 @@ def render(reports: Sequence[DomainReport], config: dict, *, duration_s: float |
     generated = reports[0].scanned_at if reports else ""
 
     cards = [
-        ("Domena", len(reports)),
-        ("Skenirano", scanned),
-        ("Delimično", partial),
-        ("Neuspešno", failed),
-        ("Na nivou 2", level2),
+        (t("card_domains"), len(reports)),
+        (t("card_scanned"), scanned),
+        (t("card_partial"), partial),
+        (t("card_failed"), failed),
+        (t("card_level2"), level2),
     ]
     if duration_s is not None:
-        cards.append(("Trajanje", f"{duration_s:.1f} s" if duration_s < 10 else f"{duration_s:.0f} s"))
+        trajanje = f"{duration_s:.1f} s" if duration_s < 10 else f"{duration_s:.0f} s"
+        cards.append((t("card_duration"), trajanje))
 
     speed = get(config, "thresholds.perf.mobile_speed_mbps")
     overhead = get(config, "report.mobile_overhead_s")
+    assumption = text(
+        "assumption_html", lang, speed=_e(speed), mb_per_s=_e(round(speed / 8, 2)), overhead=_e(overhead)
+    )
+    labels = {"copy": text("copy_draft", lang), "copied": text("copied", lang)}
+    js = JS.replace("__LABELS__", json.dumps(labels, ensure_ascii=False))
+    headers = (
+        f'<th class="num">#</th><th>{t("col_domain")}</th><th>{t("col_industry")}</th>'
+        f'<th class="num">{t("col_score")}</th>\n'
+        f'<th>{t("col_worst")}</th><th class="num">{t("col_findings")}</th>'
+        f'<th>{t("col_level2")}</th><th>{t("col_status")}</th>'
+    )
 
     return f"""<!doctype html>
-<html lang="sr"><head><meta charset="utf-8">
+<html lang="{_e(lang)}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Skener — izveštaj</title>
+<title>{t("page_title")}</title>
 <style>{CSS}</style></head>
 <body><div class="wrap">
-<h1>Skener sajtova — izveštaj</h1>
-<p class="sub">Prolaz od {_e(generated)} · verzija alata {_e(__version__)}</p>
+<h1>{t("heading")}</h1>
+<p class="sub">{t("run_of", generated=generated, version=__version__)}</p>
 
 <div class="cards">
-{"".join(f'<div class="card"><b>{_e(v)}</b><span>{_e(k)}</span></div>' for k, v in cards)}
+{"".join(f'<div class="card"><b>{_e(v)}</b><span>{k}</span></div>' for k, v in cards)}
 </div>
 
-<h2>Rangirani domeni</h2>
-<p class="sub">Redosled je po najtežem pojedinačnom nalazu, pa tek onda po zbiru: sajt sa
-jednom katastrofom je bolji lead od sajta sa deset sitnica.</p>
+<h2>{t("ranked")}</h2>
+<p class="sub">{t("ranked_note")}</p>
 <table>
 <thead><tr>
-<th class="num">#</th><th>Domen</th><th>Delatnost</th><th class="num">Skor</th>
-<th>Najteži nalaz</th><th class="num">Nalaza</th><th>Nivo 2</th><th>Stanje</th>
+{headers}
 </tr></thead>
 <tbody>
-{"".join(_row(r) for r in reports)}
+{"".join(_row(r, lang) for r in reports)}
 </tbody></table>
 
-<h2>Po domenu</h2>
-{"".join(_details(r) for r in reports)}
+<h2>{t("by_domain")}</h2>
+{"".join(_details(r, lang) for r in reports)}
 
 <footer>
-<p><b>Pretpostavka za procenu vremena učitavanja:</b> efektivna brzina
-{_e(speed)} Mb/s ({_e(round(speed / 8, 2))} MB/s, spora 4G veza) uz {_e(overhead)} s režijskog
-vremena. Broj koji šalješ klijentu moraš umeti da odbraniš, a broj bez navedene pretpostavke
-ne možeš.</p>
-<p>Alat čita, nikad ne piše. Ne skenira portove, ne pokušava prijavu, ne traži ranjivosti i
-ne dira putanje koje <code>robots.txt</code> zabranjuje.</p>
+<p>{assumption}</p>
+<p>{text("read_only_html", lang)}</p>
 </footer>
 </div>
-<script>{JS}</script>
+<script>{js}</script>
 </body></html>
 """
 
 
-def _row(report: DomainReport) -> str:
+def _row(report: DomainReport, lang: str) -> str:
     top = report.findings[0] if report.findings else None
     return (
         f'<tr><td class="num">{report.rank}</td>'
         f"<td><b>{_e(report.domain)}</b></td>"
         f"<td>{_e(report.industry)}</td>"
         f'<td class="num">{report.total_score:g}</td>'
-        f"<td>{(_badge(top.severity) + ' ' + _e(top.check_id)) if top else '—'}</td>"
+        f"<td>{(_badge(top.severity, lang) + ' ' + _e(top.check_id)) if top else '—'}</td>"
         f'<td class="num">{len(report.findings)}</td>'
-        f"<td>{'da' if report.level2_ran else 'ne'}</td>"
+        f"<td>{_e(text('yes' if report.level2_ran else 'no', lang))}</td>"
         f"<td>{_e(report.status)}</td></tr>"
     )
 
 
-def _details(report: DomainReport) -> str:
-    draft = _e(email_draft(report))
-    findings = "".join(_finding(f) for f in report.findings) or (
-        '<p class="finding">Nijedan nalaz — sajt je na proverenim tačkama uredan.</p>'
+def _details(report: DomainReport, lang: str) -> str:
+    draft = _e(email_draft(report, lang))
+    findings = "".join(_finding(f, lang) for f in report.findings) or (
+        f'<p class="finding">{_e(text("no_findings", lang))}</p>'
     )
     unknowns = ""
     if report.unknowns:
         items = "".join(
             f"<li><code>{_e(u.check_id)}</code> — {_e(u.reason)}</li>" for u in report.unknowns
         )
-        unknowns = (
-            f'<details class="unknowns"><summary>Nije moglo da se proveri '
-            f"({len(report.unknowns)})</summary><ul>{items}</ul></details>"
-        )
+        naslov = _e(text("unknowns", lang, count=len(report.unknowns)))
+        unknowns = f'<details class="unknowns"><summary>{naslov}</summary><ul>{items}</ul></details>'
     reasons = ""
     if report.escalation_reasons:
-        reasons = (
-            '<p class="tech">Na nivo 2 poslat jer: ' + _e("; ".join(report.escalation_reasons)) + "</p>"
-        )
+        razlozi = _e(text("escalated_because", lang) + "; ".join(report.escalation_reasons))
+        reasons = f'<p class="tech">{razlozi}</p>'
+    meta = text(
+        "summary_meta",
+        lang,
+        industry=report.industry,
+        score=f"{report.total_score:g}",
+        worst=f"{report.max_finding_weight:g}",
+        findings=len(report.findings),
+    )
     return f"""<details>
 <summary><span class="domain">#{report.rank} {_e(report.domain)}</span>
-<span class="meta">{_e(report.industry)} · skor {report.total_score:g} ·
-najteži {report.max_finding_weight:g} · {len(report.findings)} nalaza</span></summary>
+<span class="meta">{_e(meta)}</span></summary>
 <div class="body">
-<p><button data-draft="{draft}">Kopiraj nacrt mejla</button></p>
+<p><button data-draft="{draft}">{_e(text("copy_draft", lang))}</button></p>
 {reasons}{findings}{unknowns}
 </div></details>"""
 
 
-def _finding(finding) -> str:
+def _finding(finding, lang: str) -> str:
     urls = "".join(
         f'<div><a href="{_e(u)}" rel="noopener noreferrer nofollow">{_e(u)}</a></div>'
         for u in finding.evidence_urls[:3]
     )
+    message = poruka(finding, lang)
+    meta = text("finding_meta", lang, level=finding.level, weight=f"{finding.weight:g}")
     return f"""<div class="finding">
-<p>{_badge(finding.severity)} <code>{_e(finding.check_id)}</code>
-<span class="tech">· nivo {finding.level} · {finding.weight:g} bodova</span></p>
-<p>{_e(finding.message_client)}</p>
-<p class="tech">{_e(finding.message_tech)}</p>
+<p>{_badge(finding.severity, lang)} <code>{_e(finding.check_id)}</code>
+<span class="tech">{_e(meta)}</span></p>
+<p>{_e(message.client)}</p>
+<p class="tech">{_e(message.tech)}</p>
 <pre class="evidence">{_e(json.dumps(finding.evidence, ensure_ascii=False))}</pre>
 {urls}</div>"""
 

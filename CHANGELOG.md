@@ -10,9 +10,22 @@ kriterijumi v2 iz [plana testiranja](docs/plan-testiranja.md).
 
 ### Izmene koje lome kompatibilnost
 
-Još nijedna. Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
+Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
+
+- `Finding` više nema `message_client` ni `message_tech`. Rečenicu pravi
+  `skener.messages.render(finding, lang)` pri prikazu, a nalaz dobija `variant`
+  ([ADR-009](docs/adr/ADR-009-katalog-poruka.md)). Kolona `message_client` u `findings.csv` ostaje.
+- Dokaz nalaza je samo podatak. Nestali su složeni oblici `uz_video`, `preuzimanja`,
+  `greske_tekst`, `kopije`, `stranice`, `naslovi` i `od_slika`. `uzorak` je kod (`sitemap`,
+  `links`, `none`), nedostajuće kodiranje je `null` umesto „nema", a `lanac` preusmerenja je
+  lista URL-ova umesto teksta sa strelicama.
+- `CheckSpec` više nema šablone `message_template` i `tech_template`, a `check()` ne prima
+  `message` ni `tech`. Modul `skener.checks.srpski` je prešao u `skener.messages.sr`.
 
 ### Dodato
+
+- Izveštaji na srpskom i engleskom: `--lang sr|en` za `scan` i `recheck`. `skener explain`
+  ispisuje rečenice na oba jezika.
 
 - Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija
   ([ADR-008](docs/adr/ADR-008-pipeline.md)).
@@ -22,6 +35,7 @@ Još nijedna. Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađ
 
 ### Ispravljeno
 
+- U HTML izveštaju je pisalo „1 nalaza"; sada se broj i imenica slažu („1 nalaz", „3 nalaza").
 - Bez instaliranog Playwright-a (`pip install skener` bez `[browser]`) prolaz sa nivoom 2 je
   pucao. Sada se nivo 2 preskače uz poruku, a nivo 1 radi.
 

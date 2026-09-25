@@ -6,6 +6,7 @@ import pytest
 from factories import clean_browser, findings, run_level, statuses
 
 from skener.checks import registry
+from skener.messages import LANGS, render
 from skener.models import DomStats, NetworkStats, OversizedImage, TimingStats
 
 LEVEL2_IDS = sorted(s.check_id for s in registry.REGISTRY.values() if s.level == 2)
@@ -56,7 +57,8 @@ def test_pozitivan_nalaz(check_id):
     assert result.status == "finding", f"{check_id}: očekivan nalaz, dobijeno {result.status}"
     found = result.findings[0]
     assert any(isinstance(v, (int, float)) for v in found.evidence.values())
-    assert "{" not in found.message_client and "{" not in found.message_tech
+    for lang in LANGS:
+        assert "{" not in render(found, lang).client and "{" not in render(found, lang).tech
     assert found.level == 2
 
 
@@ -186,6 +188,15 @@ def test_timeout_bez_prekoracenja_praga_je_unknown_a_ne_ok():
     assert results["perf.request.count"].status == "unknown"
 
 
+def test_slike_su_unknown_kad_stranica_nije_dovrsila_ucitavanje():
+    """Nula slika posle prekida ne znači da ih sajt nema, pa ni da su sve opisane."""
+    browser = clean_browser()
+    browser.timing = TimingStats(dom_content_loaded_ms=3000, load_ms=None, reached="timeout")
+    browser.dom = DomStats(h1_count=1, images_total=0)
+    result = run_level(2, browser)["a11y.img.alt.missing"]
+    assert result.status == "unknown" and "slike nisu prebrojane" in result.reason
+
+
 def test_timeout_je_sam_po_sebi_nalaz_za_vreme_ucitavanja():
     browser = clean_browser()
     browser.timing = TimingStats(dom_content_loaded_ms=3000, load_ms=None, reached="timeout")
@@ -245,4 +256,5 @@ def test_nalaz_tezine_pominje_video_posebno():
     assert nalaz.severity == "critical", "22 MB bez videa je iznad 8 MB"
     assert nalaz.evidence["mb"] == 22.0
     assert nalaz.evidence["video_mb"] == 8.0
-    assert "video" in nalaz.message_client
+    assert nalaz.variant == "video"
+    assert "video" in render(nalaz, "sr").client and "video" in render(nalaz, "en").client

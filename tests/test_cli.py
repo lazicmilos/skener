@@ -152,9 +152,7 @@ def _izvestaj(**kwargs) -> DomainReport:
         level=1,
         category="seo",
         severity="critical",
-        message_client="Sve stranice prijavljuju istu adresu kao zvaničnu.",
-        message_tech="canonical_normalized identičan na 5 stranica",
-        evidence={"stranica": 5},
+        evidence={"stranica": 5, "canonical": "https://d.rs/", "grupa_putanja": 5, "uzorak": "sitemap"},
         evidence_urls=["https://d.rs/a"],
         weight=40.0,
     )
@@ -173,18 +171,48 @@ def test_nacrt_mejla_ima_tri_recenice():
     report = _izvestaj()
     nacrt = html_out.email_draft(report)
     assert report.domain in nacrt
-    assert "1. Sve stranice prijavljuju" in nacrt
+    assert "1. Više proverenih stranica sajta (5) prijavljuje" in nacrt
 
 
 def test_nacrt_mejla_za_cist_sajt_ne_izmislja_probleme():
     report = DomainReport(domain="cist.rs", industry="zdravstvo")
     assert "nisam našao" in html_out.email_draft(report)
+    assert "did not find" in html_out.email_draft(report, "en")
+
+
+def test_izvestaj_na_engleskom_nema_srpskih_oznaka():
+    page = html_out.render([_izvestaj()], load_config(), lang="en")
+    assert '<html lang="en">' in page and "▲ CRITICAL" in page and "Copy email draft" in page
+    assert "Several checked pages of the site (5)" in page
+    assert "I reviewed the site d.rs" in page
+    for srpski in ("KRITIČNO", "Kopiraj", "Rangirani", "Poštovani", "Prolaz od"):
+        assert srpski not in page, srpski
+
+
+@pytest.mark.parametrize(
+    "lang, ocekivano",
+    [pytest.param("sr", "· 1 nalaz</span>", id="sr"), pytest.param("en", "· 1 finding</span>", id="en")],
+)
+def test_broj_nalaza_u_izvestaju_se_slaze_sa_imenicom(lang, ocekivano):
+    """Bilo je „1 nalaza"; na engleskom bi bilo „1 findings" (BUG-014, isto pravilo)."""
+    assert ocekivano in html_out.render([_izvestaj()], load_config(), lang=lang)
+
+
+def test_recheck_na_engleskom(tmp_path):
+    from pathlib import Path
+
+    fixtures = Path(__file__).parent / "fixtures"
+    assert cli.main(["recheck", str(fixtures), "--out", str(tmp_path), "--lang", "en"]) == 0
+    redovi = list(csv.DictReader((tmp_path / "findings.csv").open(encoding="utf-8")))
+    assert redovi and all(r["message_client"] for r in redovi)
+    assert not [r for r in redovi if "strana" in r["message_client"] or "sajt" in r["message_client"]]
+    assert '<html lang="en">' in (tmp_path / "index.html").read_text(encoding="utf-8")
 
 
 def test_html_bezi_od_html_a_iz_sadrzaja_sajta():
     """Naslovi i adrese dolaze sa tuđeg sajta — moraju da se eskejpuju."""
     report = _izvestaj()
-    report.findings[0].message_client = '<script>alert("xss")</script>'
+    report.findings[0].evidence["canonical"] = '<script>alert("xss")</script>'
     page = html_out.render([report], load_config())
     assert "<script>alert" not in page
     assert "&lt;script&gt;" in page
@@ -215,6 +243,41 @@ def test_explain_ispisuje_prag_i_recenicu(capsys):
     ispis = capsys.readouterr().out
     assert "critical" in ispis and "3 stranice" in ispis
     assert "rečenica za klijenta" in ispis
+
+
+def test_explain_ispisuje_oba_jezika_i_varijante(capsys):
+    assert cli.main(["explain", "perf.page.weight"]) == 0
+    ispis = capsys.readouterr().out
+    assert "rečenica za klijenta (sr)" in ispis and "rečenica za klijenta (en)" in ispis
+    assert "varijanta video (sr)" in ispis and "varijanta video (en)" in ispis
+
+
+def test_explain_all_bez_markdown_a(capsys):
+    assert cli.main(["explain", "--all"]) == 0
+    assert "perf.page.weight" in capsys.readouterr().out
+
+
+def test_argumenti_komandne_linije_menjaju_konfiguraciju(tmp_path, monkeypatch):
+    """`--concurrency` menja oba semafora, `--max-level2` limit, a `--format csv` piše samo CSV."""
+    from skener.models import ScanResult
+
+    primljeno = {}
+
+    async def scan(targets, config, **kwargs):
+        primljeno.update(config=config, **kwargs)
+        return ScanResult(duration_s={"total": 0.0})
+
+    monkeypatch.setattr(cli.pipeline, "scan", scan)
+    domains = tmp_path / "d.csv"
+    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    izlaz = tmp_path / "izlaz"
+    argumenti = ["--concurrency", "2", "--max-level2", "0", "--format", "csv", "--level", "1"]
+    assert cli.main(["scan", str(domains), "--out", str(izlaz), *argumenti]) == 0
+
+    config = primljeno["config"]
+    assert config["http"]["concurrency"] == config["http"]["domain_concurrency"] == 2
+    assert config["escalation"]["max_level2"] == 0 and primljeno["level"] == "1"
+    assert (izlaz / "summary.csv").is_file() and not (izlaz / "index.html").exists()
 
 
 def test_explain_ispisuje_opis_provere(capsys):

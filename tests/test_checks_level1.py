@@ -12,6 +12,7 @@ import pytest
 from factories import clean_site, findings, run_level, statuses
 
 from skener.checks import registry
+from skener.messages import LANGS, render
 from skener.models import Entry, Soft404, Soft404Probe, Tls
 
 LEVEL1_IDS = sorted(s.check_id for s in registry.REGISTRY.values() if s.level == 1)
@@ -95,8 +96,10 @@ def test_pozitivan_nalaz(check_id):
     assert any(isinstance(v, (int, float)) for v in found.evidence.values()), (
         f"{check_id}: dokaz mora da sadrži broj — „sajt je spor\" nije nalaz (§3.5)"
     )
-    assert found.message_client and "{" not in found.message_client
-    assert found.message_tech and "{" not in found.message_tech
+    for lang in LANGS:
+        poruka = render(found, lang)
+        assert poruka.client and "{" not in poruka.client
+        assert poruka.tech and "{" not in poruka.tech
     assert found.check_id == check_id and found.level == 1
 
 
@@ -351,8 +354,8 @@ def test_mismatch_poruka_ne_tvrdi_nista_o_pretrazivacima():
     site = clean_site()
     site.home.lang = "en-US"
     nalaz = run_level(1, site)["i18n.lang.mismatch"].findings[0]
-    assert "pretraživač" not in nalaz.message_client.lower()
-    assert "čitač" in nalaz.message_client.lower()
+    assert "pretraživač" not in render(nalaz).client.lower()
+    assert "čitač" in render(nalaz).client.lower()
     assert nalaz.severity == "medium"
 
 

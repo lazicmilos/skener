@@ -56,11 +56,6 @@ def _lang_usable(lang: str | None) -> bool:
     requires=["home"],
     description="<html> nema atribut lang.",
     threshold="atribut lang ne postoji",
-    message=(
-        "U kodu sajta nigde ne piše na kom je jeziku. Čitači ekrana, koje koriste slepi i "
-        "slabovidi posetioci, zato ne znaju kojim izgovorom da ga čitaju."
-    ),
-    tech="{stranica}: <html> bez lang atributa",
 )
 def lang_missing(snapshot: SiteSnapshot, ctx: Context):
     if snapshot.home.lang is not None:
@@ -81,11 +76,6 @@ def lang_missing(snapshot: SiteSnapshot, ctx: Context):
     requires=["home"],
     description="Atribut lang postoji ali ne označava nijedan jezik.",
     threshold="lang ∈ {zxx, und, prazno} ili ne parsira kao BCP-47",
-    message=(
-        "Sajt je u kodu označen oznakom „{lang}”, koja ne označava nijedan jezik. "
-        "Za čitače ekrana je to isto kao da oznake nema."
-    ),
-    tech='{stranica}: lang="{lang}" nije upotrebljiv BCP-47 kod',
 )
 def lang_invalid(snapshot: SiteSnapshot, ctx: Context):
     lang = snapshot.home.lang
@@ -116,13 +106,6 @@ def lang_invalid(snapshot: SiteSnapshot, ctx: Context):
         "sadržaj prepoznat kao sr (ćirilica > 30 % ili dijakritici > 0,5 %) "
         "uz lang koji ne počinje sa sr"
     ),
-    message=(
-        "Sadržaj sajta je na srpskom, ali je u kodu označen kao „{lang}”. Čitači ekrana, koje "
-        "koriste slepi i slabovidi posetioci, zato srpski tekst izgovaraju po pravilima tog "
-        "jezika, pa je teško razumljiv."
-    ),
-    tech='{stranica}: lang="{lang}", sadržaj prepoznat kao {prepoznat_jezik} '
-    "(ćirilica {cirilica_udeo}, dijakritici {dijakritici_udeo}, {duzina_teksta} znakova)",
 )
 def lang_mismatch(snapshot: SiteSnapshot, ctx: Context):
     home = snapshot.home

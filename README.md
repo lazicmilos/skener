@@ -1,8 +1,8 @@
 # Skener sajtova
 
 Skener prolazi kroz listu domena, obično stotinak do dvesta, i pravi rangiranu listu sajtova koji
-zaslužuju pun ručni audit. Uz svaki sajt ide nekoliko rečenica na srpskom koje se mogu prekopirati u
-mejl. Audit ne zamenjuje. Kaže ti gde da potrošiš vreme.
+zaslužuju pun ručni audit. Uz svaki sajt ide nekoliko rečenica na srpskom ili engleskom koje se mogu
+prekopirati u mejl. Audit ne zamenjuje. Kaže ti gde da potrošiš vreme.
 
 ![Izveštaj](docs/izvestaj.png)
 
@@ -86,6 +86,7 @@ po domenu) i `snapshots/` sa sirovim podacima svakog domena.
 ```bash
 skener recheck izvestaj/snapshots/ --out novi/                  # ponovo boduje sačuvano, bez mreže
 skener recheck izvestaj/snapshots/ --config probni-pragovi.toml --out novi/
+skener recheck izvestaj/snapshots/ --lang en --out english/     # isti prolaz, izveštaj na engleskom
 skener record domains.example.csv --out tests/fixtures/
 skener explain seo.canonical.duplicate
 skener explain --all --markdown                                 # odavde je tabela provera ispod
@@ -126,6 +127,7 @@ domen da čudan rezultat, tačan ulaz koji ga je proizveo stoji sačuvan na disk
 | `fetch.http` | nivo 1 | da | ne |
 | `fetch.browser` | nivo 2 | da | ne |
 | `checks.*` | pravila: ulaz je snapshot, izlaz nalazi | ne | ne |
+| `messages` | rečenice za klijenta i operatera, oznake izveštaja, nacrt mejla; sr i en | ne | ne |
 | `score` | bodovanje, rangiranje, eskalacija | ne | ne |
 | `store`, `report.*` | snapshoti i izveštaji | ne | piše |
 
@@ -177,7 +179,13 @@ ne tvrdi da mu fali `robots.txt`. Kaže da ne zna.
 
 Rečenice za klijenta tvrde samo ono što je proverljivo, a svaki broj u njima dolazi iz izmerenog
 dokaza. Oba pravila čuvaju testovi u `tests/test_poruke.py`, uz slaganje broja i imenice („4 glavna
-naslova", „5 glavnih naslova").
+naslova", „5 glavnih naslova", „4 main headings").
+
+Nalaz nosi samo dokaz: brojeve, URL-ove i tehničke kodove. Rečenicu pravi katalog u
+`skener/messages/` tek pri prikazu, na jeziku koji bira `--lang sr|en`
+([ADR-009](docs/adr/ADR-009-katalog-poruka.md)). Zato isti prolaz može da se prikaže na oba
+jezika. Engleska rečenica tvrdi tačno isto što i srpska, ni više ni manje, a `skener explain`
+ispisuje obe.
 
 ## Zašto su pragovi baš takvi
 

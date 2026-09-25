@@ -9,7 +9,6 @@ pokvaren, i to pošalješ u mejlu (§15, zamka 1).
 from __future__ import annotations
 
 from skener.checks.registry import Context, check, finding, ok, unknown
-from skener.checks.srpski import sa_brojem
 
 # Zakonska izloženost po pristupačnosti je veća, pa je prag ozbiljnosti niži.
 IZLOZENE_DELATNOSTI = {"zdravstvo", "institucija"}
@@ -25,14 +24,6 @@ IZLOZENE_DELATNOSTI = {"zdravstvo", "institucija"}
     threshold=(
         "≥ 5 slika i udeo bez alt atributa > 0,5; > 0,8 uz ≥ 15 slika → high; "
         "zdravstvo/institucija → bar medium"
-    ),
-    message=(
-        "{bez_alta} od {od_slika} nema tekstualni opis (alt). Posetioci koji koriste čitače "
-        "ekrana ne saznaju šta je na njima, a Google ima manje podataka za pretragu slika."
-    ),
-    tech=(
-        "images_without_alt_attr={bez_alta}/{ukupno} (udeo {udeo}), "
-        "images_empty_alt={prazan_alt} se namerno ne broji, nemereno={nemereno}"
     ),
 )
 def img_alt_missing(snapshot, ctx: Context):
@@ -61,7 +52,6 @@ def img_alt_missing(snapshot, ctx: Context):
         evidence={
             "bez_alta": dom.images_without_alt_attr,
             "ukupno": dom.images_total,
-            "od_slika": sa_brojem(dom.images_total, "slike", "slike", "slika"),
             "prazan_alt": dom.images_empty_alt,
             "udeo": round(ratio, 3),
             "nemereno": dom.images_unmeasured,

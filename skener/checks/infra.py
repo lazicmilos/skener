@@ -21,11 +21,6 @@ NE_POSTOJI = frozenset({404, 410})
     requires=["sitemap"],
     description="Nema sitemap.xml, ili postoji ali je prazan.",
     threshold="status 404 ili 410, ili 200 sa 0 URL-ova; ostali statusi → unknown",
-    message=(
-        "Sajt nema mapu stranica (sitemap). Google zato nove i dublje stranice pronalazi samo "
-        "preko linkova, sporije, a stranice do kojih ne vodi nijedan link može i da ne pronađe."
-    ),
-    tech="sitemap status={status}, urls={broj_urlova}",
 )
 def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     info = snapshot.sitemap
@@ -52,11 +47,6 @@ def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     requires=["robots"],
     description="Nema robots.txt.",
     threshold="status 404 ili 410; ostali statusi osim 200 → unknown",
-    message=(
-        "Sajt nema robots.txt. Ništa se time ne lomi, ali je to fajl koji svaki pretraživač "
-        "prvo traži, i njegov izostanak je znak da se sajt nije podešavao za pretragu."
-    ),
-    tech="robots.txt status={status}",
 )
 def robots_missing(snapshot: SiteSnapshot, ctx: Context):
     status = snapshot.robots.status
@@ -82,12 +72,6 @@ def robots_missing(snapshot: SiteSnapshot, ctx: Context):
     requires=["soft404"],
     description="Nepostojeća adresa vraća 200 umesto 404.",
     threshold="obe sonde vraćaju konačni status 200 (§5.2); status van {200, 404, 410} → unknown",
-    message=(
-        "Na nepostojeću adresu sajt vraća običnu stranicu umesto poruke o grešci — obe "
-        "proverene izmišljene adrese vratile su status {status}. Pretraživači zato teže "
-        "razlikuju prave stranice od nepostojećih i troše obilazak sajta na prazne adrese."
-    ),
-    tech="obe sonde status={status}, sličnost sa početnom {slicnost}",
 )
 def soft404(snapshot: SiteSnapshot, ctx: Context):
     probes = snapshot.soft404.probes
@@ -129,11 +113,6 @@ def soft404(snapshot: SiteSnapshot, ctx: Context):
     requires=["entry"],
     description="Sertifikat je nevalidan ili istekao.",
     threshold="TLS provera odbila sertifikat",
-    message=(
-        "Sertifikat sajta nije valjan, pa pretraživač posetiocima prikazuje crveno upozorenje "
-        "pre nego što uđu na sajt. Većina se na toj strani vrati nazad."
-    ),
-    tech="TLS greška: {greska}",
 )
 def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
     entry = snapshot.entry
@@ -171,11 +150,6 @@ def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
     requires=["entry"],
     description="Domen se ne razrešava preko DNS-a.",
     threshold="DNS upit nije vratio adresu",
-    message=(
-        "Domen se uopšte ne otvara — ne postoji zapis koji ga povezuje sa serverom. "
-        "Za posetioca i za Google sajt trenutno ne postoji."
-    ),
-    tech="DNS ne razrešava: {detalj}",
 )
 def dns_unresolved(snapshot: SiteSnapshot, ctx: Context):
     entry = snapshot.entry

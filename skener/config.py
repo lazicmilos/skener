@@ -6,6 +6,9 @@ preko** nje, pa parcijalna korisnička konfiguracija ne gubi ostale pragove.
 
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 import os
 import tomllib
 import unicodedata
@@ -16,6 +19,18 @@ from skener import __version__
 from skener.models import CATEGORIES, INDUSTRIES
 
 CONFIG_NAME = "skener.toml"
+
+# Ne menjaju rezultat, pa ne ulaze u otisak konfiguracije: ko skenira, koliko paralelno i
+# gde je browser. Dva prolaza sa istim otiskom imaju iste pragove, množioce i bodove.
+BEZ_UTICAJA_NA_REZULTAT = (
+    "identitet",
+    "http.concurrency",
+    "http.per_host_concurrency",
+    "http.domain_concurrency",
+    "http.user_agent",
+    "browser.concurrency",
+    "browser.executable_path",
+)
 
 # Srpska ćirilica i đ nemaju ASCII rastavljanje, pa se presipaju ručno; š, č, ć i ž
 # posle toga rastavlja NFKD. HTTP zaglavlje sme da nosi samo ASCII.
@@ -92,6 +107,22 @@ def user_agent(cfg: dict[str, Any]) -> str:
             "SKENER_NAZIV i SKENER_KONTAKT."
         )
     return get(cfg, "http.user_agent").format(verzija=__version__, naziv=naziv, kontakt=kontakt)
+
+
+def digest(cfg: dict[str, Any]) -> str:
+    """sha256 kanonskog JSON-a konfiguracije koja utiče na rezultat.
+
+    `diff` po njemu zna da li je razlika između dva prolaza od sajta ili od pragova.
+    """
+    kopija = copy.deepcopy(cfg)
+    for dotted in BEZ_UTICAJA_NA_REZULTAT:
+        *put, kljuc = dotted.split(".")
+        sekcija = kopija
+        for deo in put:
+            sekcija = sekcija.get(deo, {})
+        sekcija.pop(kljuc, None)
+    kanonski = json.dumps(kopija, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(kanonski.encode("utf-8")).hexdigest()
 
 
 def multiplier(cfg: dict[str, Any], industry: str, category: str) -> float:

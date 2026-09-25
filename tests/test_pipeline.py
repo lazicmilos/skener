@@ -88,6 +88,7 @@ def test_dva_prolaza_u_istoj_petlji(dva_prolaza):
         assert sorted(r.domain for r in rezultat.ranked) == sorted(t.domain for t in targets)
         assert all(r.level2_ran for r in rezultat.ranked)
         assert set(rezultat.duration_s) == {"level1", "level2", "total"}
+        assert rezultat.environment["chromium"], "verzija Chromium-a kojim je meren nivo 2"
 
 
 @pytest.mark.browser

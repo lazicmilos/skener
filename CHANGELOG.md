@@ -24,9 +24,11 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Dodato
 
+- JSON izveštaj `report.json` sa verzijom šeme (`skener/schema/report-2.json`), otiskom
+  konfiguracije i okruženjem. `--format` ga podrazumevano piše uz HTML i CSV.
+- Snapshot nivoa 2 beleži verziju Chromium-a kojim je meren.
 - Izveštaji na srpskom i engleskom: `--lang sr|en` za `scan` i `recheck`. `skener explain`
   ispisuje rečenice na oba jezika.
-
 - Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija
   ([ADR-008](docs/adr/ADR-008-pipeline.md)).
 - Log tokom prolaza ima brojač napretka („nivo 1: 43/200 gotovo").

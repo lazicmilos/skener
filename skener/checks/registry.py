@@ -176,8 +176,19 @@ REQUIREMENTS: dict[str, tuple[Callable[[Any], bool], str]] = {
 }
 
 
+# Provera koja čita polje uvedeno u v2 navodi ga u `requires` kao `v2:<polje>`. Snapshot iz
+# 1.x to polje nema, a na njima je kalibrisana lista A: provera je tada `unknown`, nikad
+# `ok` sa podrazumevanom vrednošću i nikad pad.
+NOVO_POLJE = "v2:"
+
+
 def unmet(spec: CheckSpec, snapshot: Any) -> str | None:
     for name in spec.requires:
+        if name.startswith(NOVO_POLJE):
+            verzija = getattr(snapshot, "scanner_version", "")
+            if verzija.startswith("1."):
+                return f"snapshot iz verzije {verzija} nema {name.removeprefix(NOVO_POLJE)}"
+            continue
         predicate, reason = REQUIREMENTS[name]
         try:
             if not predicate(snapshot):

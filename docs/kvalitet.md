@@ -39,10 +39,11 @@ sada učitava jedan po jedan, pa svaki spor sajt produžava ceo prolaz.
 |---|---|---|
 | interoperabilnost | CSV po RFC 4180, BOM samo na zahtev (Excel) | `report/csv_out.py`, `test_bom_se_pise_samo_kad_se_trazi` |
 | interoperabilnost | HTML izveštaj je jedan fajl bez CDN-a | `test_html_je_samostalan` |
+| interoperabilnost | JSON izveštaj sa verzijom šeme; izlaz se validira po šemi | `test_json_izvestaj_prolazi_semu` |
 | koegzistencija | poštuje `robots.txt` i `Crawl-delay`; jasan User-Agent sa kontaktom | `test_robots_disallow_se_postuje` |
 
-**Rupe.** Nema mašinski čitljivog formata sa verzijom šeme (JSON izveštaj). Za CRM integraciju u v2
-to će zatrebati.
+**Rupe.** JSON izveštaj sa verzijom šeme postoji (`report.json`, šema `report-2.json`), ali CRM
+integracija nije napravljena. Nju pravi onaj ko ga čita.
 
 ## 4. Upotrebljivost — može li korisnik da ga koristi?
 

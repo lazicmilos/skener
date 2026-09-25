@@ -20,7 +20,7 @@ from skener.config import ConfigError, load_config
 from skener.inputs import InputError, read_domain_list
 from skener.messages import LANGS, catalog, templates
 from skener.models import DomainInput, Event, ScanResult
-from skener.report import csv_out, html_out
+from skener.report import csv_out, html_out, json_out
 
 log = logging.getLogger("skener")
 
@@ -156,6 +156,8 @@ def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
         html_out.write(
             out / "index.html", reports, config, duration_s=result.duration_s["total"], lang=args.lang
         )
+    if "json" in formats:
+        json_out.write(out / "report.json", result)
 
     nalaza = sum(len(r.findings) for r in reports)
     print(f"\n{len(reports)} domena · {nalaza} nalaza · izlaz u {out}/", file=sys.stderr)
@@ -251,7 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--config", metavar="FILE", help="TOML koji se spaja preko skener.toml")
         sub.add_argument("--out", default="out", metavar="DIR", help="gde idu izveštaji (podrazumevano: out)")
         sub.add_argument(
-            "--format", default="html,csv", help="html, csv ili oba (podrazumevano: html,csv)"
+            "--format", default="html,csv,json", help="html, csv, json ili više njih (podrazumevano: sva tri)"
         )
         sub.add_argument("--csv-bom", action="store_true", help="UTF-8 sa BOM-om, za Excel")
         sub.add_argument(

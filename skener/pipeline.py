@@ -10,16 +10,17 @@ su već završeni ostaju na disku.
 from __future__ import annotations
 
 import logging
+import platform
 import time
 import typing
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
 from skener import store
 from skener.checks import registry
-from skener.config import user_agent
+from skener.config import digest, user_agent
 from skener.fetch.browser import capture_all
 from skener.fetch.http import scan_domains
 from skener.inputs import InputError
@@ -114,7 +115,7 @@ async def scan(
         for site in sites
     ]
     durations = {"level1": t1 - t0, "level2": t2 - t1, "total": time.monotonic() - t0}
-    return _result(reports, started_at, durations)
+    return _result(reports, started_at, durations, config, browsers.values())
 
 
 def _level1_status(site: SiteSnapshot) -> str:
@@ -176,16 +177,30 @@ def _playwright_installed(posledica: str) -> bool:
     return True
 
 
-def _result(reports: list[DomainReport], started_at: str, durations: dict[str, float]) -> ScanResult:
+def _result(
+    reports: list[DomainReport],
+    started_at: str,
+    durations: dict[str, float],
+    config: dict,
+    browsers: Iterable[BrowserSnapshot],
+) -> ScanResult:
     ranked = rank(reports)
     counts = Counter(report.status for report in ranked)
     return ScanResult(
         started_at=started_at,
         finished_at=_now(),
         duration_s={name: round(seconds, 2) for name, seconds in durations.items()},
-        ranked=ranked,
+        config_digest=digest(config),
+        environment=_environment(browsers),
         summary={status: counts[status] for status in typing.get_args(DomainStatus)},
+        ranked=ranked,
     )
+
+
+def _environment(browsers: Iterable[BrowserSnapshot]) -> dict[str, str | None]:
+    """Gde je prolaz rađen. Chromium je iz snapshota, pa `recheck` navodi onaj iz prolaza."""
+    chromium = next((b.browser_version for b in browsers if b.browser_version), None)
+    return {"os": platform.platform(), "python": platform.python_version(), "chromium": chromium}
 
 
 # --------------------------------------------------------------------------- #
@@ -208,7 +223,8 @@ def recheck(snapshot_dir: Path, config: dict, *, on_event: OnEvent | None = None
         reports.append(report)
         progress.domain(site.domain, report.status)
     progress.finish()
-    return _result(reports, started_at, {"total": time.monotonic() - t0})
+    browsers = [browser for _, browser in pairs if browser is not None]
+    return _result(reports, started_at, {"total": time.monotonic() - t0}, config, browsers)
 
 
 # --------------------------------------------------------------------------- #

@@ -23,6 +23,8 @@ Industry = Literal[
 ]
 DomainStatus = Literal["scanned", "partial", "failed"]
 
+# JSON izveštaj: dodato polje podiže drugi broj, a obrisano ili promenjeno prvi (README).
+SCHEMA_VERSION = "2.0"
 SEVERITY_ORDER: dict[str, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 INDUSTRIES: tuple[str, ...] = typing.get_args(Industry)
 CATEGORIES: tuple[str, ...] = typing.get_args(Category)
@@ -262,6 +264,7 @@ class BrowserSnapshot:
     url: str = ""
     fetched_at: str = ""
     scanner_version: str = __version__
+    browser_version: str = ""
     status: Literal["ok", "partial", "failed"] = "failed"
     network: NetworkStats = field(default_factory=NetworkStats)
     timing: TimingStats = field(default_factory=TimingStats)
@@ -354,14 +357,22 @@ class Event:
 
 @dataclass
 class ScanResult:
-    """Ceo prolaz: metapodaci, rangirani izveštaji i zbir po statusu."""
+    """Ceo prolaz: metapodaci, zbir po statusu i rangirani izveštaji.
 
+    Serijalizovan je to JSON izveštaj, pa redosled polja određuje i redosled ključeva, a
+    šema je u `skener/schema/report-2.json`.
+    """
+
+    schema_version: str = SCHEMA_VERSION
+    scanner_version: str = __version__
     started_at: str = ""
     finished_at: str = ""
     duration_s: dict[str, float] = field(default_factory=dict)
-    scanner_version: str = __version__
-    ranked: list[DomainReport] = field(default_factory=list)
+    # sha256 konfiguracije koja utiče na rezultat; isti otisak = isti pragovi
+    config_digest: str = ""
+    environment: dict[str, str | None] = field(default_factory=dict)
     summary: dict[str, int] = field(default_factory=dict)
+    ranked: list[DomainReport] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #

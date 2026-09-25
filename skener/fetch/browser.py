@@ -230,6 +230,7 @@ async def capture(
         url=url,
         fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         scanner_version=__version__,
+        browser_version=browser.version,
     )
     timeout_ms = get(config, "browser.timeout_s") * 1000
     recorder = _Recorder()

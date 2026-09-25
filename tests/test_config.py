@@ -1,6 +1,6 @@
 import pytest
 
-from skener.config import ConfigError, _validate, get, load_config, multiplier, user_agent
+from skener.config import ConfigError, _validate, digest, get, load_config, multiplier, user_agent
 
 
 def test_ucitava_podrazumevanu_konfiguraciju():
@@ -217,3 +217,36 @@ def test_nedostaje_cela_sekcija(sekcija):
     del cfg[sekcija]
     with pytest.raises(ConfigError, match=sekcija):
         _validate(cfg)
+
+
+# --------------------------------------------------------------------------- #
+# Otisak konfiguracije: `diff` po njemu zna da li je razlika od sajta ili od pragova
+# --------------------------------------------------------------------------- #
+def test_otisak_ne_zavisi_od_identiteta_i_paralelizma():
+    prva, druga = load_config(), load_config()
+    druga["identitet"] = {"naziv": "Drugi studio", "kontakt": "drugi@primer.rs"}
+    druga["http"]["concurrency"] = druga["http"]["domain_concurrency"] = 2
+    druga["browser"]["concurrency"] = 1
+    druga["browser"]["executable_path"] = "/usr/bin/chromium"
+    assert digest(prva) == digest(druga)
+    assert len(digest(prva)) == 64
+
+
+@pytest.mark.parametrize(
+    "kljuc, vrednost",
+    [
+        pytest.param(("thresholds", "perf", "html_size_kb"), 501, id="prag"),
+        pytest.param(("severity_points", "critical"), 41, id="bodovi"),
+        pytest.param(("industry_multipliers", "hotel", "social"), 1.4, id="mnozilac"),
+        pytest.param(("escalation", "max_level2"), 59, id="limit-nivoa-2"),
+    ],
+)
+def test_otisak_se_menja_kad_se_promeni_prag(kljuc, vrednost):
+    cfg = load_config()
+    pre = digest(cfg)
+    *put, poslednji = kljuc
+    sekcija = cfg
+    for deo in put:
+        sekcija = sekcija[deo]
+    sekcija[poslednji] = vrednost
+    assert digest(cfg) != pre

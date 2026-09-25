@@ -79,7 +79,28 @@ razdvojene sa `;` i fajl sačuvan u windows-1250 umesto UTF-8. Domen koji se pon
 jednom, a važi prvo pojavljivanje.
 
 U izlaznom folderu su `index.html` (izveštaj), `findings.csv` (red po nalazu), `summary.csv` (red
-po domenu) i `snapshots/` sa sirovim podacima svakog domena.
+po domenu), `report.json` (ceo prolaz, za programe) i `snapshots/` sa sirovim podacima svakog
+domena. `--format` bira koje od prva četiri se pišu; snapshoti se pišu uvek.
+
+### JSON izveštaj
+
+`report.json` je ugovor za web aplikaciju, `skener diff`, CRM i kupca koda. Oblik opisuje šema
+[`skener/schema/report-2.json`](skener/schema/report-2.json), a verzija šeme je prvo polje
+dokumenta (`schema_version`). Uz nju idu verzija alata, vreme prolaza u UTC-u, trajanje po nivou,
+otisak konfiguracije (`config_digest`: sha256 pragova, množilaca i bodova, bez identiteta i
+paralelizma), okruženje (OS, Python, Chromium) i zbir po statusu.
+
+Nalaz u JSON-u nema rečenicu, nego `check_id`, dokaz i `variant`. Rečenica se pravi iz dokaza,
+na jeziku onoga ko čita.
+
+Pravila promene šeme:
+
+- dodato polje podiže drugi broj (`2.0` → `2.1`), jer ga stari čitalac može preskočiti;
+- obrisano polje, promenjen tip ili značenje polja i preimenovan `check_id` podižu prvi broj
+  (`2.x` → `3.0`).
+
+Šema ne dozvoljava nepoznata polja, pa novo polje mora prvo u šemu. Test pada ako izlaz ne
+prolazi šemu.
 
 ### Ostale komande
 

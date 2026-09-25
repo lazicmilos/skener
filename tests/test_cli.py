@@ -79,6 +79,17 @@ def test_scan_pravi_sve_izlaze(prolaz):
     assert list((out / "snapshots").glob("*/site.json")), "snapshoti se uvek pišu (§2.2)"
 
 
+def test_scan_pise_json_po_semi(prolaz):
+    import jsonschema
+    from test_json import SEMA
+
+    _code, out, _cist, _los = prolaz
+    dokument = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    jsonschema.validate(dokument, SEMA)
+    assert set(dokument["duration_s"]) == {"level1", "level2", "total"}
+    assert dokument["environment"]["chromium"] is None, "nivo 2 nije radio (--level 1)"
+
+
 def test_summary_ima_red_po_domenu(prolaz):
     _code, out, _cist, _los = prolaz
     rows = list(csv.DictReader((out / "summary.csv").open(encoding="utf-8")))

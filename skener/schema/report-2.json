@@ -47,6 +47,13 @@
   "$defs": {
     "utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
     "severity": {"enum": ["critical", "high", "medium", "low"]},
+    "reason": {
+      "description": "Razlog bez rečenice: kod iz kataloga i podaci. Rečenicu pravi skener.messages.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "evidence"],
+      "properties": {"code": {"type": "string", "minLength": 1}, "evidence": {"type": "object"}}
+    },
     "domain_report": {
       "type": "object",
       "additionalProperties": false,
@@ -60,7 +67,7 @@
         "final_url": {"type": ["string", "null"]},
         "status": {"enum": ["scanned", "partial", "failed"]},
         "level2_ran": {"type": "boolean"},
-        "escalation_reasons": {"type": "array", "items": {"type": "string"}},
+        "escalation_reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}},
         "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
         "unknowns": {
           "type": "array",
@@ -68,7 +75,7 @@
             "type": "object",
             "additionalProperties": false,
             "required": ["check_id", "reason"],
-            "properties": {"check_id": {"type": "string"}, "reason": {"type": "string", "minLength": 1}}
+            "properties": {"check_id": {"type": "string"}, "reason": {"$ref": "#/$defs/reason"}}
           }
         },
         "total_score": {"type": "number", "minimum": 0},

@@ -34,6 +34,7 @@ DECIMAL = decimalni
 # Tehnički kodovi iz dokaza, onako kako se čitaju u rečenici.
 CODES: dict[str, dict[object, str]] = {
     "kodiranje": {None: "nema"},
+    "vrsta": {None: "nepoznato"},
     "uzorak": {"sitemap": "sitemap", "links": "interni linkovi sa početne", "none": "samo početna"},
 }
 
@@ -322,4 +323,46 @@ TEXT: dict[str, str] = {
     "severity_high": "VISOKO",
     "severity_medium": "SREDNJE",
     "severity_low": "NISKO",
+}
+
+# Razlozi: zašto nešto nije provereno (`unknown`) i zašto domen ide na nivo 2. Čita ih
+# operater, ne klijent, pa su tehnički.
+REASONS: dict[str, str] = {
+    "requires.entry": "početna strana nije ni pokušana (budžet potrošen pre nje)",
+    "requires.entry_response": "početna nije vratila nijedan odgovor (mrežna greška pre HTTP-a)",
+    "requires.home": "početna strana nije uspešno dohvaćena",
+    "requires.home_html": "sirovi HTML početne strane nije sačuvan",
+    "requires.pages": "uzorak ima manje od 3 uspešno dohvaćene stranice",
+    "requires.robots": "zahtev za robots.txt nije izvršen (mrežna greška ili budžet)",
+    "requires.sitemap": "zahtev za sitemap nije izvršen (mrežna greška ili budžet)",
+    "requires.soft404": "obe sonde za lažni 404 nisu izvršene",
+    "requires.browser": "stranica nije otvorena u browseru",
+    "requires.network": "mrežni saobraćaj nije izmeren",
+    "v1_snapshot": "snapshot iz verzije {verzija} nema {polje}",
+    "check_crashed": "provera je pukla: {greska}",
+    "sitemap_status": "server je na sitemap odgovorio statusom {status}; iz toga se ne vidi da li postoji",
+    "robots_status": "server je na robots.txt odgovorio statusom {status}; iz toga se ne vidi da li postoji",
+    "probe_status": (
+        "sonde su dobile status {statusi:join:, }; iz toga se ne vidi kako sajt odgovara na "
+        "nepostojeću adresu"
+    ),
+    "tls_no_connection": "veza nije uspostavljena ({vrsta}), sertifikat nije proveren",
+    "tls_over_http": (
+        "https nije uspeo ({vrsta}: {detalj}); sajt je dohvaćen preko http-a, sertifikat nije proveren"
+    ),
+    "unmeasured_responses": "{nemereno} odgovora nije izmereno (prag {prag})",
+    "load_incomplete": "učitavanje prekinuto pre kraja, izmereno je nepotpuno",
+    "load_not_measured": "vreme učitavanja nije izmereno",
+    "images_unmeasured": "{nemereno} od {ukupno} slika nije izmereno",
+    "h1_timeout": "stranica nije dovršila učitavanje, h1 može da stigne kasnije",
+    "images_timeout": "stranica nije dovršila učitavanje, slike nisu prebrojane",
+    "text_too_short": "premalo teksta u sirovom HTML-u ({duzina} < {prag} znakova)",
+    # eskalacija na nivo 2
+    "raw_text_short": "sirovi HTML ima {znakova} znakova teksta (< {prag})",
+    "no_h1_raw": "sirovi HTML nema nijedan h1 — sadržaj se verovatno crta iz JS-a",
+    "medium_finding": "ima bar jedan nalaz nivoa 1 ozbiljnosti ≥ medium",
+    "html_large": "HTML početne je {bajtova} B (> {prag})",
+    "html_uncompressed": "HTML se ne šalje kompresovan",
+    "slow_entry": "početna odgovara za {ms} ms (> {prag})",
+    "forced_level2": "izričito traženo preko --level 2",
 }

@@ -21,6 +21,7 @@ DECIMAL = decimal
 
 CODES: dict[str, dict[object, str]] = {
     "kodiranje": {None: "none"},
+    "vrsta": {None: "unknown"},
     "uzorak": {"sitemap": "sitemap", "links": "internal links from the home page", "none": "home page only"},
 }
 
@@ -310,4 +311,49 @@ TEXT: dict[str, str] = {
     "severity_high": "HIGH",
     "severity_medium": "MEDIUM",
     "severity_low": "LOW",
+}
+
+REASONS: dict[str, str] = {
+    "requires.entry": "the home page was not even attempted (budget spent before it)",
+    "requires.entry_response": "the home page returned no response (network error before HTTP)",
+    "requires.home": "the home page was not fetched successfully",
+    "requires.home_html": "the raw HTML of the home page was not saved",
+    "requires.pages": "the sample has fewer than 3 successfully fetched pages",
+    "requires.robots": "the robots.txt request was not made (network error or budget)",
+    "requires.sitemap": "the sitemap request was not made (network error or budget)",
+    "requires.soft404": "the two soft 404 probes were not both made",
+    "requires.browser": "the page was not opened in the browser",
+    "requires.network": "network traffic was not measured",
+    "v1_snapshot": "a snapshot from version {verzija} has no {polje}",
+    "check_crashed": "the check crashed: {greska}",
+    "sitemap_status": (
+        "the server answered the sitemap request with status {status}; that does not show whether it exists"
+    ),
+    "robots_status": (
+        "the server answered the robots.txt request with status {status}; that does not show whether it "
+        "exists"
+    ),
+    "probe_status": (
+        "the probes got status {statusi:join:, }; that does not show how the site answers a nonexistent "
+        "address"
+    ),
+    "tls_no_connection": "no connection was established ({vrsta}), the certificate was not checked",
+    "tls_over_http": (
+        "https failed ({vrsta}: {detalj}); the site was fetched over http, the certificate was not checked"
+    ),
+    "unmeasured_responses": "{nemereno} responses were not measured (threshold {prag})",
+    "load_incomplete": "loading was cut off before the end, the measurement is incomplete",
+    "load_not_measured": "the loading time was not measured",
+    "images_unmeasured": "{nemereno} of {ukupno} images were not measured",
+    "h1_timeout": "the page did not finish loading, the h1 may arrive later",
+    "images_timeout": "the page did not finish loading, the images were not counted",
+    "text_too_short": "too little text in the raw HTML ({duzina} < {prag} characters)",
+    # escalation to level 2
+    "raw_text_short": "the raw HTML has {znakova} characters of text (< {prag})",
+    "no_h1_raw": "the raw HTML has no h1 — the content is probably drawn by JavaScript",
+    "medium_finding": "there is at least one level 1 finding of severity ≥ medium",
+    "html_large": "the home page HTML is {bajtova} B (> {prag})",
+    "html_uncompressed": "the HTML is not sent compressed",
+    "slow_entry": "the home page responds in {ms} ms (> {prag})",
+    "forced_level2": "explicitly requested with --level 2",
 }

@@ -30,6 +30,7 @@ from skener.models import (
     DomainReport,
     DomainStatus,
     Event,
+    Reason,
     ScanResult,
     SiteSnapshot,
 )
@@ -139,21 +140,21 @@ def _level1_status(site: SiteSnapshot) -> str:
 
 def _escalate(
     sites: Sequence[SiteSnapshot], config: dict, level: str
-) -> tuple[dict[str, list[str]], list[SiteSnapshot]]:
+) -> tuple[dict[str, list[Reason]], list[SiteSnapshot]]:
     """Eskalacija (§6) i gornji limit; vraća razloge za izveštaj i izabrane domene."""
     if level == "1":
         return {}, []
 
     registry.load_all()
     candidates: list[tuple[SiteSnapshot, list]] = []
-    reasons: dict[str, list[str]] = {}
+    reasons: dict[str, list[Reason]] = {}
     for site in sites:
         ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)
         results = registry.run(1, site, ctx)
         why = escalation_reasons(site, results, config)
         if why or level == "2":
             candidates.append((site, results))
-            reasons[site.domain] = why or ["izričito traženo preko --level 2"]
+            reasons[site.domain] = why or [Reason("forced_level2")]
 
     chosen = select_for_level2(candidates, config)
     log.info(

@@ -12,7 +12,7 @@ import pytest
 from factories import clean_site, findings, run_level, statuses
 
 from skener.checks import registry
-from skener.messages import LANGS, render
+from skener.messages import LANGS, reason, render
 from skener.models import Entry, Soft404, Soft404Probe, Tls
 
 LEVEL1_IDS = sorted(s.check_id for s in registry.REGISTRY.values() if s.level == 1)
@@ -176,7 +176,7 @@ def test_mismatch_je_unknown_kad_je_teksta_premalo():
     site.home.text_length = 7
     result = run_level(1, site)["i18n.lang.mismatch"]
     assert result.status == "unknown"
-    assert "premalo teksta" in result.reason
+    assert "premalo teksta" in reason(result.reason)
 
 
 def test_sadrzaj_bez_dijakritika_ne_pravi_mismatch():
@@ -278,7 +278,7 @@ def test_robots_status_odredjuje_ishod(status, ocekivano):
     rezultat = run_level(1, site)["infra.robots.missing"]
     assert rezultat.status == ocekivano
     if ocekivano == NE_ZNA_SE:
-        assert str(status) in rezultat.reason
+        assert str(status) in reason(rezultat.reason)
 
 
 @pytest.mark.parametrize("status, ocekivano", STATUSI_FAJLA)
@@ -290,7 +290,7 @@ def test_sitemap_status_odredjuje_ishod(status, ocekivano):
     rezultat = run_level(1, site)["infra.sitemap.missing"]
     assert rezultat.status == ocekivano
     if ocekivano == NE_ZNA_SE:
-        assert str(status) in rezultat.reason
+        assert str(status) in reason(rezultat.reason)
 
 
 def test_sitemap_200_bez_ijednog_url_a_je_nalaz():
@@ -339,7 +339,7 @@ def test_blokiran_sajt_ne_dobija_nalaze_iz_odbijenih_zahteva():
     rezultati = run_level(1, site)
     for check_id in ("infra.robots.missing", "infra.sitemap.missing", "infra.soft404"):
         assert rezultati[check_id].status == NE_ZNA_SE, check_id
-        assert "403" in rezultati[check_id].reason
+        assert "403" in reason(rezultati[check_id].reason)
 
 
 # --------------------------------------------------------------------------- #
@@ -371,4 +371,4 @@ def test_tls_je_unknown_kad_je_https_pao_a_sajt_dohvacen_preko_http():
     site.errors.append(SnapshotError("entry", "tls_handshake", "UNEXPECTED_EOF_WHILE_READING"))
     rezultat = run_level(1, site)["infra.tls.invalid"]
     assert rezultat.status == "unknown"
-    assert "UNEXPECTED_EOF_WHILE_READING" in rezultat.reason
+    assert "UNEXPECTED_EOF_WHILE_READING" in reason(rezultat.reason)

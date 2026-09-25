@@ -258,11 +258,13 @@ def test_html_bezi_od_html_a_iz_sadrzaja_sajta():
 
 
 def test_unknown_razlozi_se_prikazuju():
-    from skener.models import Unknown
+    from skener.models import Reason, Unknown
 
-    report = _izvestaj(unknowns=[Unknown(check_id="perf.page.weight", reason="9 odgovora nemereno")])
+    report = _izvestaj(
+        unknowns=[Unknown("perf.page.weight", Reason("unmeasured_responses", {"nemereno": 9, "prag": 5}))]
+    )
     page = html_out.render([report], load_config())
-    assert "9 odgovora nemereno" in page
+    assert "9 odgovora nije izmereno (prag 5)" in page
     assert "perf.page.weight" in page
 
 

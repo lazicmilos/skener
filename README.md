@@ -206,7 +206,7 @@ Nalaz nosi samo dokaz: brojeve, URL-ove i tehničke kodove. Rečenicu pravi kata
 `skener/messages/` tek pri prikazu, na jeziku koji bira `--lang sr|en`
 ([ADR-009](docs/adr/ADR-009-katalog-poruka.md)). Zato isti prolaz može da se prikaže na oba
 jezika. Engleska rečenica tvrdi tačno isto što i srpska, ni više ni manje, a `skener explain`
-ispisuje obe.
+ispisuje obe. Isto važi za razloge zašto nešto nije provereno i zašto je domen poslat na nivo 2.
 
 ## Zašto su pragovi baš takvi
 

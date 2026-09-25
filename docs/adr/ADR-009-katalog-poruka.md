@@ -38,7 +38,9 @@ dobije ispravljenu rečenicu.
 - Nova provera traži unos u oba kataloga; test pada ako neki fali ili ako jezik ima višak.
 - Engleska rečenica ne sme da tvrdi više od srpske. Isti testovi važe za oba jezika, a
   englesku verziju pregleda vlasnik.
-- Razlozi za `unknown` i razlozi eskalacije ostaju tehničke beleške na srpskom.
+- Razlozi za `unknown` i razlozi eskalacije isto su kod i podaci (`Reason`), a rečenicu pravi
+  `skener.messages.reason` (odluka vlasnika od 25.09.2026.). Golden fajl
+  `tests/golden/razlozi-sr.json` čuva srpske rečenice kakve su bile pre izmene.
 - Dokaz se promenio: nestali su složeni oblici, `uzorak` je kod (`sitemap`, `links`), nedostajuće
   kodiranje je `null`, a lanac preusmerenja je lista. To je izmena koja lomi kompatibilnost i
   upisana je u CHANGELOG.

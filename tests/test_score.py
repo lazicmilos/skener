@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from factories import CONFIG, clean_site, run_level
 
-from skener.models import CheckResult, Finding
+from skener.models import CheckResult, Finding, Reason
 from skener.score import (
     build_report,
     escalation_reasons,
@@ -176,7 +176,7 @@ def test_prazan_izvestaj_ima_nulu_a_ne_pad():
 
 def test_status_partial_kad_ima_unknown():
     site = clean_site()
-    results = [CheckResult(check_id="x", status="unknown", reason="nije izmereno")]
+    results = [CheckResult(check_id="x", status="unknown", reason=Reason("load_not_measured"))]
     assert build_report(site, results, CONFIG).status == "partial"
 
 
@@ -201,7 +201,7 @@ def test_prazan_sirovi_html_salje_na_nivo_2():
     site.home.h1_count_raw = 0
     razlozi = escalation_reasons(site, run_level(1, site).values(), CONFIG)
     assert len(razlozi) >= 2
-    assert any("h1" in r for r in razlozi)
+    assert any(r.code == "no_h1_raw" for r in razlozi)
 
 
 def test_prazan_sirovi_html_nije_nalaz_nego_signal():
@@ -218,7 +218,7 @@ def test_nalaz_ozbiljnosti_medium_salje_na_nivo_2():
     site = clean_site()
     site.home.meta_description = None  # medium
     razlozi = escalation_reasons(site, run_level(1, site).values(), CONFIG)
-    assert any("medium" in r for r in razlozi)
+    assert any(r.code == "medium_finding" for r in razlozi)
 
 
 def test_spora_pocetna_salje_na_nivo_2():
@@ -235,13 +235,13 @@ def test_spora_pocetna_salje_na_nivo_2():
     site.entry.elapsed_ms = 2400
     razlozi = escalation_reasons(site, results.values(), CONFIG)
     assert len(razlozi) == 1
-    assert "2400 ms" in razlozi[0]
+    assert razlozi[0].code == "slow_entry" and razlozi[0].evidence["ms"] == 2400
 
 
 def test_veliki_html_salje_na_nivo_2():
     site = clean_site()
     site.home.html_bytes = 400_000
-    assert any("HTML početne" in r for r in escalation_reasons(site, [], CONFIG))
+    assert any(r.code == "html_large" for r in escalation_reasons(site, [], CONFIG))
 
 
 def test_domen_bez_pocetne_ne_ide_na_nivo_2():

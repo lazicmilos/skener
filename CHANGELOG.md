@@ -12,6 +12,10 @@ kriterijumi v2 iz [plana testiranja](docs/plan-testiranja.md).
 
 Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
+- Razlog za `unknown` i razlog eskalacije više nisu rečenice nego `Reason(code, evidence)`, u
+  modelu i u JSON-u (`unknowns[].reason`, `escalation_reasons[]`). Rečenicu pravi
+  `skener.messages.reason(razlog, lang)`, pa su razlozi u izveštaju na engleskom sada na
+  engleskom.
 - `Finding` više nema `message_client` ni `message_tech`. Rečenicu pravi
   `skener.messages.render(finding, lang)` pri prikazu, a nalaz dobija `variant`
   ([ADR-009](docs/adr/ADR-009-katalog-poruka.md)). Kolona `message_client` u `findings.csv` ostaje.

@@ -112,10 +112,7 @@ def lang_mismatch(snapshot: SiteSnapshot, ctx: Context):
     min_text = ctx.th("thresholds.i18n.min_text_length")
     if home.text_length < min_text:
         # Ujedno i signal za eskalaciju na nivo 2 (§6): sadržaj se verovatno crta iz JS-a.
-        return unknown(
-            lang_mismatch.spec,
-            f"premalo teksta u sirovom HTML-u ({home.text_length} < {min_text} znakova)",
-        )
+        return unknown(lang_mismatch.spec, "text_too_short", duzina=home.text_length, prag=min_text)
     # Nedostajuću i neupotrebljivu oznaku pokrivaju druge dve provere; `zxx` mora
     # da padne u `invalid`, ne ovde (§12.4).
     if not _lang_usable(home.lang):

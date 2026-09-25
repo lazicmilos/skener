@@ -126,10 +126,8 @@ def page_weight(snapshot, ctx: Context):
     max_unmeasured = ctx.th("browser.max_unmeasured_responses")
     if network.unmeasured_responses > max_unmeasured:
         # Merenje u koje nemaš poverenja gore je od merenja kojeg nema (§7.2).
-        return unknown(
-            page_weight.spec,
-            f"{network.unmeasured_responses} odgovora nije izmereno (prag {max_unmeasured})",
-        )
+        nemereno = network.unmeasured_responses
+        return unknown(page_weight.spec, "unmeasured_responses", nemereno=nemereno, prag=max_unmeasured)
 
     # Video se skida koliko vreme merenja dozvoli — isti sajt je izmeren jednom 8,5, a
     # drugi put 26,9 MB — pa ne ulazi u prag, nego stoji posebno u poruci (O-2).
@@ -139,7 +137,7 @@ def page_weight(snapshot, ctx: Context):
     severity = _tier(mb, ctx.th("thresholds.perf.page_weight_mb"))
     if severity is None:
         if snapshot.timing.reached == "timeout":
-            return unknown(page_weight.spec, "učitavanje prekinuto pre kraja, izmereno je nepotpuno")
+            return unknown(page_weight.spec, "load_incomplete")
         return ok(page_weight.spec)
     return finding(
         page_weight.spec,
@@ -175,7 +173,7 @@ def request_count(snapshot, ctx: Context):
     severity = _tier(count, ctx.th("thresholds.perf.request_count"))
     if severity is None:
         if snapshot.timing.reached == "timeout":
-            return unknown(request_count.spec, "učitavanje prekinuto pre kraja, izmereno je nepotpuno")
+            return unknown(request_count.spec, "load_incomplete")
         return ok(request_count.spec)
     return finding(
         request_count.spec,
@@ -211,7 +209,7 @@ def load_time(snapshot, ctx: Context):
             urls=[snapshot.url],
         )
     if timing.load_ms is None:
-        return unknown(load_time.spec, "vreme učitavanja nije izmereno")
+        return unknown(load_time.spec, "load_not_measured")
     severity = _tier(timing.load_ms, ctx.th("thresholds.perf.load_ms"))
     if severity is None:
         return ok(load_time.spec)
@@ -260,8 +258,7 @@ def img_oversized(snapshot, ctx: Context):
     # Bez ovoga ne znaš da li je „0 predimenzioniranih slika" nalaz ili neuspelo merenje (§3.3).
     if dom.images_unmeasured and dom.images_unmeasured >= dom.images_total / 2:
         return unknown(
-            img_oversized.spec,
-            f"{dom.images_unmeasured} od {dom.images_total} slika nije izmereno",
+            img_oversized.spec, "images_unmeasured", nemereno=dom.images_unmeasured, ukupno=dom.images_total
         )
     return ok(img_oversized.spec)
 

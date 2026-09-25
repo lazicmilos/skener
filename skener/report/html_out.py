@@ -16,6 +16,7 @@ from pathlib import Path
 
 from skener import __version__
 from skener.config import get
+from skener.messages import reason as razlog
 from skener.messages import render as poruka
 from skener.messages import text
 from skener.models import DomainReport
@@ -214,13 +215,14 @@ def _details(report: DomainReport, lang: str) -> str:
     unknowns = ""
     if report.unknowns:
         items = "".join(
-            f"<li><code>{_e(u.check_id)}</code> — {_e(u.reason)}</li>" for u in report.unknowns
+            f"<li><code>{_e(u.check_id)}</code> — {_e(razlog(u.reason, lang))}</li>" for u in report.unknowns
         )
         naslov = _e(text("unknowns", lang, count=len(report.unknowns)))
         unknowns = f'<details class="unknowns"><summary>{naslov}</summary><ul>{items}</ul></details>'
     reasons = ""
     if report.escalation_reasons:
-        razlozi = _e(text("escalated_because", lang) + "; ".join(report.escalation_reasons))
+        razlozi = "; ".join(razlog(r, lang) for r in report.escalation_reasons)
+        razlozi = _e(text("escalated_because", lang) + razlozi)
         reasons = f'<p class="tech">{razlozi}</p>'
     meta = text(
         "summary_meta",

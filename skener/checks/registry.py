@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from skener.config import get
-from skener.models import CheckResult, Finding
+from skener.models import CheckResult, Finding, Reason
 
 CheckFn = Callable[[Any, "Context"], CheckResult]
 
@@ -90,9 +90,12 @@ def ok(spec: CheckSpec) -> CheckResult:
     return CheckResult(check_id=spec.check_id, status="ok")
 
 
-def unknown(spec: CheckSpec, reason: str) -> CheckResult:
-    """`unknown` bez razloga je bug (§3.4) — potpis to i ne dozvoljava."""
-    return CheckResult(check_id=spec.check_id, status="unknown", reason=reason)
+def unknown(spec: CheckSpec, reason: str, **evidence: Any) -> CheckResult:
+    """`unknown` bez razloga je bug (§3.4) — potpis to i ne dozvoljava.
+
+    Razlog je kod iz kataloga (`skener.messages`) i podaci za rečenicu, kao kod nalaza.
+    """
+    return CheckResult(check_id=spec.check_id, status="unknown", reason=Reason(reason, evidence))
 
 
 def finding(
@@ -135,44 +138,18 @@ def _home_ok(snapshot: Any) -> bool:
     return bool(home and home.status == 200 and home.html_bytes)
 
 
-REQUIREMENTS: dict[str, tuple[Callable[[Any], bool], str]] = {
-    "entry": (
-        lambda s: s.entry is not None,
-        "početna strana nije ni pokušana (budžet potrošen pre nje)",
-    ),
-    "entry_response": (
-        lambda s: s.entry is not None and s.entry.status is not None,
-        "početna nije vratila nijedan odgovor (mrežna greška pre HTTP-a)",
-    ),
-    "home": (_home_ok, "početna strana nije uspešno dohvaćena"),
-    "home_html": (
-        lambda s: bool(s.home and s.home.raw_html),
-        "sirovi HTML početne strane nije sačuvan",
-    ),
-    "pages": (
-        lambda s: sum(1 for p in s.pages if p.status == 200) >= 3,
-        "uzorak ima manje od 3 uspešno dohvaćene stranice",
-    ),
-    "robots": (
-        lambda s: s.robots.status is not None,
-        "zahtev za robots.txt nije izvršen (mrežna greška ili budžet)",
-    ),
-    "sitemap": (
-        lambda s: s.sitemap.status is not None,
-        "zahtev za sitemap nije izvršen (mrežna greška ili budžet)",
-    ),
-    "soft404": (
-        lambda s: len(s.soft404.probes) == 2 and all(p.status is not None for p in s.soft404.probes),
-        "obe sonde za lažni 404 nisu izvršene",
-    ),
-    "browser": (
-        lambda s: s.status != "failed",
-        "stranica nije otvorena u browseru",
-    ),
-    "network": (
-        lambda s: s.status != "failed" and s.network.request_count > 0,
-        "mrežni saobraćaj nije izmeren",
-    ),
+# Rečenica za neispunjen preduslov je u katalogu pod `requires.<ime>`.
+REQUIREMENTS: dict[str, Callable[[Any], bool]] = {
+    "entry": lambda s: s.entry is not None,
+    "entry_response": lambda s: s.entry is not None and s.entry.status is not None,
+    "home": _home_ok,
+    "home_html": lambda s: bool(s.home and s.home.raw_html),
+    "pages": lambda s: sum(1 for p in s.pages if p.status == 200) >= 3,
+    "robots": lambda s: s.robots.status is not None,
+    "sitemap": lambda s: s.sitemap.status is not None,
+    "soft404": lambda s: len(s.soft404.probes) == 2 and all(p.status is not None for p in s.soft404.probes),
+    "browser": lambda s: s.status != "failed",
+    "network": lambda s: s.status != "failed" and s.network.request_count > 0,
 }
 
 
@@ -182,19 +159,19 @@ REQUIREMENTS: dict[str, tuple[Callable[[Any], bool], str]] = {
 NOVO_POLJE = "v2:"
 
 
-def unmet(spec: CheckSpec, snapshot: Any) -> str | None:
+def unmet(spec: CheckSpec, snapshot: Any) -> Reason | None:
     for name in spec.requires:
         if name.startswith(NOVO_POLJE):
             verzija = getattr(snapshot, "scanner_version", "")
             if verzija.startswith("1."):
-                return f"snapshot iz verzije {verzija} nema {name.removeprefix(NOVO_POLJE)}"
+                return Reason("v1_snapshot", {"verzija": verzija, "polje": name.removeprefix(NOVO_POLJE)})
             continue
-        predicate, reason = REQUIREMENTS[name]
         try:
-            if not predicate(snapshot):
-                return reason
+            ispunjen = REQUIREMENTS[name](snapshot)
         except (AttributeError, TypeError):
-            return reason
+            ispunjen = False
+        if not ispunjen:
+            return Reason(f"requires.{name}")
     return None
 
 
@@ -215,12 +192,12 @@ def run(level: int, snapshot: Any, ctx: Context) -> list[CheckResult]:
     for spec in specs_for(level, ctx):
         reason = unmet(spec, snapshot)
         if reason:
-            results.append(unknown(spec, reason))
+            results.append(CheckResult(check_id=spec.check_id, status="unknown", reason=reason))
             continue
         try:
             results.append(spec.fn(snapshot, ctx))
         except Exception as exc:  # noqa: BLE001 — granica domena, namerno široka
-            results.append(unknown(spec, f"provera je pukla: {type(exc).__name__}: {exc}"))
+            results.append(unknown(spec, "check_crashed", greska=f"{type(exc).__name__}: {exc}"))
     return results
 
 

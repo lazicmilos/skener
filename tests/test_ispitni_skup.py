@@ -167,7 +167,7 @@ def test_cdei_nema_nijedan_seo_nalaz_a_ipak_stize_na_nivo_2(izvestaji):
     assert seo == set(), f"lažni pozitivi u SEO grupi: {sorted(seo)}"
     assert any(c.startswith("perf.") for c in ids(report))
     assert report.level2_ran
-    assert any("ms" in razlog for razlog in report.escalation_reasons), (
+    assert any(razlog.code == "slow_entry" for razlog in report.escalation_reasons), (
         f"na nivo 2 je morao da stigne zbog sporog odgovora, a stigao je zbog: "
         f"{report.escalation_reasons}"
     )

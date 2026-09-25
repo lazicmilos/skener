@@ -16,6 +16,7 @@ from skener.models import (
     CheckResult,
     DomainReport,
     Finding,
+    Reason,
     SiteSnapshot,
     Unknown,
 )
@@ -36,7 +37,7 @@ def collect(results: Iterable[CheckResult]) -> tuple[list[Finding], list[Unknown
     for result in results:
         findings.extend(result.findings)
         if result.status == "unknown":
-            unknowns.append(Unknown(check_id=result.check_id, reason=result.reason or ""))
+            unknowns.append(Unknown(check_id=result.check_id, reason=result.reason))
     return findings, unknowns
 
 
@@ -46,7 +47,7 @@ def build_report(
     config: dict,
     *,
     browser: BrowserSnapshot | None = None,
-    escalation_reasons: Sequence[str] = (),
+    escalation_reasons: Sequence[Reason] = (),
 ) -> DomainReport:
     findings, unknowns = collect(results)
     for finding in findings:
@@ -93,7 +94,7 @@ def rank(reports: Iterable[DomainReport]) -> list[DomainReport]:
 # --------------------------------------------------------------------------- #
 # Politika eskalacije na nivo 2 (§6)
 # --------------------------------------------------------------------------- #
-def escalation_reasons(site: SiteSnapshot, results: Sequence[CheckResult], config: dict) -> list[str]:
+def escalation_reasons(site: SiteSnapshot, results: Sequence[CheckResult], config: dict) -> list[Reason]:
     """Razlozi zbog kojih domen ide na nivo 2; prazna lista znači da ne ide.
 
     Prazan sirovi HTML **nije nalaz**, nego signal. Ako ga prijaviš kao nalaz,
@@ -103,28 +104,28 @@ def escalation_reasons(site: SiteSnapshot, results: Sequence[CheckResult], confi
     if home is None or home.status != 200:
         return []
 
-    reasons: list[str] = []
+    reasons: list[Reason] = []
     text_limit = get(config, "escalation.empty_html_text_threshold")
     if home.text_length < text_limit:
-        reasons.append(f"sirovi HTML ima {home.text_length} znakova teksta (< {text_limit})")
+        reasons.append(Reason("raw_text_short", {"znakova": home.text_length, "prag": text_limit}))
     if home.h1_count_raw == 0:
-        reasons.append("sirovi HTML nema nijedan h1 — sadržaj se verovatno crta iz JS-a")
+        reasons.append(Reason("no_h1_raw"))
 
     findings, _ = collect(results)
     if any(SEVERITY_ORDER[f.severity] >= SEVERITY_ORDER["medium"] for f in findings):
-        reasons.append("ima bar jedan nalaz nivoa 1 ozbiljnosti ≥ medium")
+        reasons.append(Reason("medium_finding"))
 
     html_limit = get(config, "escalation.raw_html_bytes")
     if home.html_bytes > html_limit:
-        reasons.append(f"HTML početne je {home.html_bytes} B (> {html_limit})")
+        reasons.append(Reason("html_large", {"bajtova": home.html_bytes, "prag": html_limit}))
     if any(f.check_id == "perf.compression.missing" for f in findings):
-        reasons.append("HTML se ne šalje kompresovan")
+        reasons.append(Reason("html_uncompressed"))
 
     # Ovaj uslov zatvara rupu koju ostala četiri ostavljaju: sajt sa čistim SEO-om
     # i sporom stranicom inače nikad ne bi stigao na nivo 2 (§6, `cdei.rs`).
     slow = get(config, "escalation.slow_entry_ms")
     if site.entry and site.entry.elapsed_ms and site.entry.elapsed_ms > slow:
-        reasons.append(f"početna odgovara za {site.entry.elapsed_ms} ms (> {slow})")
+        reasons.append(Reason("slow_entry", {"ms": site.entry.elapsed_ms, "prag": slow}))
     return reasons
 
 
@@ -161,7 +162,7 @@ def analyze(
     config: dict,
     *,
     browser: BrowserSnapshot | None = None,
-    escalation: Sequence[str] = (),
+    escalation: Sequence[Reason] = (),
 ) -> DomainReport:
     """Snapshoti → provere → bodovan izveštaj. Bez I/O, pa `recheck` ide bez mreže."""
     from skener.checks import registry

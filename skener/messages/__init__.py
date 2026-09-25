@@ -77,6 +77,12 @@ def render(finding: Any, lang: str = "sr") -> Message:
     )
 
 
+def reason(r: Any, lang: str = "sr") -> str:
+    """Razlog za `unknown` ili za eskalaciju, iz koda i podataka."""
+    cat = catalog(lang)
+    return _Formatter(cat, localize=True).format(cat.REASONS[r.code], **r.evidence)
+
+
 def text(key: str, lang: str = "sr", **values: Any) -> str:
     """Oznaka iz izveštaja ili deo nacrta mejla."""
     cat = catalog(lang)

@@ -12,7 +12,7 @@ import pytest
 from factories import CONFIG, clean_browser, clean_site, run_level
 
 from skener.fetch.http import DomainBudget
-from skener.models import CheckResult, Finding, OversizedImage, Unknown
+from skener.models import CheckResult, Finding, OversizedImage, Reason, Unknown
 from skener.score import _status, build_report, escalation_reasons, select_for_level2
 
 
@@ -337,18 +337,18 @@ def _kvar(site, uslov: str) -> list:
 @pytest.mark.parametrize(
     "uslov, trag",
     [
-        pytest.param("prazan-html", "znakova teksta", id="tab-prazan-html"),
-        pytest.param("nema-h1", "h1", id="tab-nema-h1"),
-        pytest.param("nalaz-medium", "medium", id="tab-nalaz-medium"),
-        pytest.param("veliki-html", "HTML početne", id="tab-veliki-html"),
-        pytest.param("nekompresovan", "kompresovan", id="tab-nekompresovan"),
-        pytest.param("spora-pocetna", "ms", id="tab-spora-pocetna"),
+        pytest.param("prazan-html", "raw_text_short", id="tab-prazan-html"),
+        pytest.param("nema-h1", "no_h1_raw", id="tab-nema-h1"),
+        pytest.param("nalaz-medium", "medium_finding", id="tab-nalaz-medium"),
+        pytest.param("veliki-html", "html_large", id="tab-veliki-html"),
+        pytest.param("nekompresovan", "html_uncompressed", id="tab-nekompresovan"),
+        pytest.param("spora-pocetna", "slow_entry", id="tab-spora-pocetna"),
     ],
 )
 def test_eskalacija_svaki_uslov_sam_menja_ishod(uslov, trag):
     site = clean_site()
     razlozi = escalation_reasons(site, _kvar(site, uslov), CONFIG)
-    assert razlozi and any(trag in r for r in razlozi), razlozi
+    assert razlozi and any(r.code == trag for r in razlozi), razlozi
 
 
 def test_eskalacija_nijedan_uslov():
@@ -398,7 +398,7 @@ def test_status_domena_tabela(pocetna, unknown, budzet, ocekivano):
     if not pocetna:
         site.pages.clear()
     site.budget.exhausted = budzet
-    nepoznati = [Unknown(check_id="seo.title.duplicate", reason="razlog")] if unknown else []
+    nepoznati = [Unknown(check_id="seo.title.duplicate", reason=Reason("requires.pages"))] if unknown else []
     assert _status(site, nepoznati) == ocekivano
 
 
@@ -452,7 +452,7 @@ def test_budzet_vremena_granica(monkeypatch, proteklo, dozvoljen):
 def test_unknown_ne_donosi_bodove_nego_status_partial():
     """Klasa `unknown`: ne sme da se pretvori u bodove, ali mora da se vidi u statusu."""
     site = clean_site()
-    nepoznat = CheckResult(check_id="seo.title.duplicate", status="unknown", reason="nema uzorka")
+    nepoznat = CheckResult(check_id="seo.title.duplicate", status="unknown", reason=Reason("requires.pages"))
     izvestaj = build_report(site, [nepoznat], CONFIG)
     assert izvestaj.findings == [] and izvestaj.total_score == 0
     assert izvestaj.status == "partial"

@@ -31,7 +31,7 @@ def img_alt_missing(snapshot, ctx: Context):
     min_images = ctx.th("thresholds.a11y.min_images")
 
     if dom.images_total == 0 and snapshot.timing.reached == "timeout":
-        return unknown(img_alt_missing.spec, "stranica nije dovršila učitavanje, slike nisu prebrojane")
+        return unknown(img_alt_missing.spec, "images_timeout")
     if dom.images_total < min_images:
         return ok(img_alt_missing.spec)
 

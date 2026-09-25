@@ -6,7 +6,7 @@ import pytest
 from factories import clean_browser, findings, run_level, statuses
 
 from skener.checks import registry
-from skener.messages import LANGS, render
+from skener.messages import LANGS, reason, render
 from skener.models import DomStats, NetworkStats, OversizedImage, TimingStats
 
 LEVEL2_IDS = sorted(s.check_id for s in registry.REGISTRY.values() if s.level == 2)
@@ -168,7 +168,7 @@ def test_previse_neizmerenih_odgovora_je_unknown():
     browser.network = NetworkStats(request_count=40, total_bytes=500_000, unmeasured_responses=9)
     result = run_level(2, browser)["perf.page.weight"]
     assert result.status == "unknown"
-    assert "nije izmereno" in result.reason
+    assert "nije izmereno" in reason(result.reason)
 
 
 def test_neuspeo_browser_daje_unknown_svuda():
@@ -194,7 +194,7 @@ def test_slike_su_unknown_kad_stranica_nije_dovrsila_ucitavanje():
     browser.timing = TimingStats(dom_content_loaded_ms=3000, load_ms=None, reached="timeout")
     browser.dom = DomStats(h1_count=1, images_total=0)
     result = run_level(2, browser)["a11y.img.alt.missing"]
-    assert result.status == "unknown" and "slike nisu prebrojane" in result.reason
+    assert result.status == "unknown" and "slike nisu prebrojane" in reason(result.reason)
 
 
 def test_timeout_je_sam_po_sebi_nalaz_za_vreme_ucitavanja():
@@ -219,7 +219,7 @@ def test_nula_predimenzioniranih_uz_nemerene_slike_je_unknown():
     browser.dom = DomStats(h1_count=1, images_total=20, images_unmeasured=15)
     result = run_level(2, browser)["perf.img.oversized"]
     assert result.status == "unknown"
-    assert "nije izmereno" in result.reason
+    assert "nije izmereno" in reason(result.reason)
 
 
 def test_veliki_visak_bajtova_pali_nalaz_i_ispod_tri_slike():

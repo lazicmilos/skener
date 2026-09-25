@@ -27,10 +27,7 @@ def sitemap_missing(snapshot: SiteSnapshot, ctx: Context):
     if info.status == 200 and info.urls:
         return ok(sitemap_missing.spec)
     if info.status != 200 and info.status not in NE_POSTOJI:
-        return unknown(
-            sitemap_missing.spec,
-            f"server je na sitemap odgovorio statusom {info.status}; iz toga se ne vidi da li postoji",
-        )
+        return unknown(sitemap_missing.spec, "sitemap_status", status=info.status)
     return finding(
         sitemap_missing.spec,
         ctx,
@@ -53,10 +50,7 @@ def robots_missing(snapshot: SiteSnapshot, ctx: Context):
     if status == 200:
         return ok(robots_missing.spec)
     if status not in NE_POSTOJI:
-        return unknown(
-            robots_missing.spec,
-            f"server je na robots.txt odgovorio statusom {status}; iz toga se ne vidi da li postoji",
-        )
+        return unknown(robots_missing.spec, "robots_status", status=status)
     return finding(
         robots_missing.spec,
         ctx,
@@ -79,11 +73,7 @@ def soft404(snapshot: SiteSnapshot, ctx: Context):
     if not all(s == 200 for s in statuses):
         odbijene = [s for s in statuses if s != 200 and s not in NE_POSTOJI]
         if odbijene:
-            return unknown(
-                soft404.spec,
-                f"sonde su dobile status {', '.join(map(str, odbijene))}; iz toga se ne vidi "
-                "kako sajt odgovara na nepostojeću adresu",
-            )
+            return unknown(soft404.spec, "probe_status", statusi=odbijene)
         # Jedna sonda 200 a druga 404 → `ok`, ne nalaz (§5.2).
         return ok(soft404.spec)
 
@@ -121,18 +111,11 @@ def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
         # Veza koja nije ni uspostavljena ne dokazuje da je sertifikat ispravan.
         # `ok` bi ovde bio tvrdnja koju nismo proverili (§3.4).
         if entry.status is None:
-            return unknown(
-                tls_invalid.spec,
-                f"veza nije uspostavljena ({entry.error_kind or 'nepoznato'}), sertifikat nije proveren",
-            )
+            return unknown(tls_invalid.spec, "tls_no_connection", vrsta=entry.error_kind)
         # Https nije uspeo, pa je sajt dohvaćen preko http-a: sertifikat nije ni viđen (BUG-004).
         https = next((e for e in snapshot.errors if e.stage == "entry"), None)
         if https is not None and entry.requested_url.startswith("http://"):
-            return unknown(
-                tls_invalid.spec,
-                f"https nije uspeo ({https.kind}: {https.detail[:120]}); sajt je dohvaćen preko "
-                "http-a, sertifikat nije proveren",
-            )
+            return unknown(tls_invalid.spec, "tls_over_http", vrsta=https.kind, detalj=https.detail[:120])
         return ok(tls_invalid.spec)
     return finding(
         tls_invalid.spec,

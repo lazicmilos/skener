@@ -13,6 +13,7 @@ from factories import clean_browser
 from skener import pipeline, store
 from skener.checks import registry
 from skener.config import load_config
+from skener.messages import reason
 from skener.models import CheckResult, to_jsonable
 from skener.report import json_out
 
@@ -76,7 +77,8 @@ def test_v1_snapshot_daje_unknown_a_ne_pad(provera_novog_polja):
     ctx = registry.Context(domain=browser.domain, industry="ostalo", config=load_config())
     rezultat = {r.check_id: r for r in registry.run(2, browser, ctx)}["test.novo.polje"]
     assert rezultat.status == "unknown"
-    assert rezultat.reason == f"snapshot iz verzije {browser.scanner_version} nema network.bytes_at_load"
+    ocekivano = f"snapshot iz verzije {browser.scanner_version} nema network.bytes_at_load"
+    assert reason(rezultat.reason) == ocekivano
     assert provera_novog_polja == [], "provera se ne izvršava nad snapshotom koji nema polje"
 
 

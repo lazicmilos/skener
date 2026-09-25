@@ -209,7 +209,7 @@ def h1_missing(snapshot, ctx: Context):
     if snapshot.dom.h1_count > 0:
         return ok(h1_missing.spec)
     if snapshot.timing.reached == "timeout":
-        return unknown(h1_missing.spec, "stranica nije dovršila učitavanje, h1 može da stigne kasnije")
+        return unknown(h1_missing.spec, "h1_timeout")
     return finding(
         h1_missing.spec,
         ctx,

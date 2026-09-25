@@ -16,7 +16,7 @@ from factories import clean_browser, clean_site, run_level
 from poruke_slucajevi import GOLDEN, slucajevi
 
 from skener.checks import registry
-from skener.messages import LANGS, catalog, render
+from skener.messages import LANGS, catalog, reason, render
 from skener.messages.en import plural as en_oblik
 from skener.messages.sr import sa_brojem
 
@@ -51,6 +51,39 @@ def test_katalog_je_potpun_za_svaki_jezik(lang):
         assert set(entry.get("variants", {})) == set(sr.FINDINGS[check_id].get("variants", {})), check_id
     assert set(cat.TEXT) == set(sr.TEXT)
     assert set(cat.CODES) == set(sr.CODES)
+    assert set(cat.REASONS) == set(sr.REASONS)
+    assert {f"requires.{ime}" for ime in registry.REQUIREMENTS} <= set(cat.REASONS)
+
+
+def test_svaki_kod_razloga_iz_koda_postoji_u_katalogu():
+    """Kod razloga je string u proveri; greška u kucanju bi se videla tek kad provera ne zna."""
+    from pathlib import Path
+
+    paket = Path(registry.__file__).parents[1]
+    izvor = "".join(p.read_text(encoding="utf-8") for p in paket.rglob("*.py"))
+    kodovi = set(re.findall(r'unknown\(\s*[\w.]+,\s*"([\w.]+)"', izvor))
+    kodovi |= set(re.findall(r'Reason\("([\w.]+)"', izvor))
+    assert len(kodovi) > 20, kodovi
+    assert kodovi <= set(catalog("sr").REASONS), sorted(kodovi - set(catalog("sr").REASONS))
+
+
+def test_srpski_razlozi_isti_kao_pre_prevodjenja():
+    """Golden je napravljen kodom u kome su razlozi bili gotove srpske rečenice."""
+    from poruke_slucajevi import GOLDEN_RAZLOZI, razlozi
+
+    golden = json.loads(GOLDEN_RAZLOZI.read_text(encoding="utf-8"))
+    sada = [{"slucaj": s, "provera": c, "razlog": reason(r, "sr")} for s, c, r in razlozi()]
+    assert len(sada) == len(golden)
+    for staro, novo in zip(golden, sada, strict=True):
+        assert novo == staro
+
+
+def test_razlozi_na_engleskom_nemaju_srpskih_reci():
+    from poruke_slucajevi import razlozi
+
+    for slucaj, _, r in razlozi():
+        tekst = reason(r, "en")
+        assert not re.search(r"[čćšžđ]|\b(nije|sajt|stranica|početna)\b", tekst), (slucaj, tekst)
 
 
 def test_nepoznat_jezik_je_greska():

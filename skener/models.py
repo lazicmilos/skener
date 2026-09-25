@@ -294,10 +294,21 @@ class Finding:
 
 
 @dataclass
+class Reason:
+    """Zašto nešto nije provereno ili zašto domen ide na nivo 2: kod i podaci, bez rečenice.
+
+    Rečenicu pravi `skener.messages.reason` na jeziku izveštaja, isto kao za nalaz.
+    """
+
+    code: str
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class CheckResult:
     check_id: str
     status: CheckStatus
-    reason: str | None = None
+    reason: Reason | None = None
     findings: list[Finding] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -312,7 +323,7 @@ class CheckResult:
 @dataclass
 class Unknown:
     check_id: str
-    reason: str
+    reason: Reason
 
 
 @dataclass
@@ -322,7 +333,7 @@ class DomainReport:
     final_url: str | None = None
     status: DomainStatus = "scanned"
     level2_ran: bool = False
-    escalation_reasons: list[str] = field(default_factory=list)
+    escalation_reasons: list[Reason] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     unknowns: list[Unknown] = field(default_factory=list)
     total_score: float = 0.0

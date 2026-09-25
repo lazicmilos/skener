@@ -12,6 +12,17 @@ kriterijumi v2 iz [plana testiranja](docs/plan-testiranja.md).
 
 Još nijedna. Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
+### Dodato
+
+- Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija
+  ([ADR-008](docs/adr/ADR-008-pipeline.md)).
+- Log tokom prolaza ima brojač napretka („nivo 1: 43/200 gotovo").
+
+### Ispravljeno
+
+- Bez instaliranog Playwright-a (`pip install skener` bez `[browser]`) prolaz sa nivoom 2 je
+  pucao. Sada se nivo 2 preskače uz poruku, a nivo 1 radi.
+
 ## 1.0.0 — 24.09.2026.
 
 Prvo izdanje: 28 provera na dva nivoa (sirovi HTTP i pravi browser), bodovanje po delatnosti,

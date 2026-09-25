@@ -54,8 +54,9 @@ to će zatrebati.
 | zaštita od greške | lista iz Excel-a radi i sa `;` i u windows-1250; duplikati se skeniraju jednom; nula ili negativan broj u konfiguraciji se odbija | `test_csv_iz_excela_sa_tackom_zarezom`, `test_paralelizam_i_budzet_moraju_biti_pozitivni` |
 | pristupačnost | ozbiljnost ima oznaku i znak, ne samo boju | `test_ozbiljnost_ima_oznaku_i_znak_a_ne_samo_boju` |
 
-**Rupe.** Tokom prolaza od više minuta jedini napredak su JSON linije na stderr, bez brojača „43/200".
-Za alat koji koristi jedan čovek to je prihvatljivo, za bilo koga drugog nije.
+**Rupe.** Napredak se vidi kao brojač u logu („nivo 1: 43/200 gotovo"), a traka napretka postoji
+tek kad je napravi pozivalac iz događaja `on_event` (web aplikacija). Log je JSON na stderr, što je
+za nekog ko nije programer i dalje teško za čitanje.
 
 ## 5. Pouzdanost — radi li stabilno tokom vremena?
 

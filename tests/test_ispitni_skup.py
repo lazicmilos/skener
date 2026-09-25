@@ -185,6 +185,16 @@ def test_protetica_je_na_dnu_rangiranja(izvestaji):
     assert poredak[0].domain == "restoranmb.com"
 
 
+def test_recheck_kroz_pipeline_daje_isto_rangiranje(izvestaji):
+    """`izvestaji` ide starim putem iz `cmd_recheck`. Pipeline ne sme ništa da promeni."""
+    from skener import pipeline
+    from skener.models import to_jsonable
+
+    stari = rank(list(izvestaji.values()))
+    novi = pipeline.recheck(FIXTURES, spec_config()).ranked
+    assert [to_jsonable(r) for r in novi] == [to_jsonable(r) for r in stari]
+
+
 # --------------------------------------------------------------------------- #
 # Fixture-i zastarevaju (§12.2)
 # --------------------------------------------------------------------------- #

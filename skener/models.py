@@ -336,6 +336,33 @@ class DomainReport:
 
 
 # --------------------------------------------------------------------------- #
+# Prolaz kao celina: rezultat i događaji napretka (skener.pipeline)
+# --------------------------------------------------------------------------- #
+@dataclass
+class Event:
+    """Napredak prolaza. Web worker iz njega pravi traku napretka, a CLI ga loguje."""
+
+    kind: Literal["phase_started", "phase_finished", "domain_finished"]
+    phase: Literal["level1", "level2", "recheck"]
+    total: int
+    done: int = 0
+    domain: str | None = None
+    status: str | None = None
+
+
+@dataclass
+class ScanResult:
+    """Ceo prolaz: metapodaci, rangirani izveštaji i zbir po statusu."""
+
+    started_at: str = ""
+    finished_at: str = ""
+    duration_s: dict[str, float] = field(default_factory=dict)
+    scanner_version: str = __version__
+    ranked: list[DomainReport] = field(default_factory=list)
+    summary: dict[str, int] = field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------- #
 # Ulazni red iz domains.csv (§4.1)
 # --------------------------------------------------------------------------- #
 @dataclass

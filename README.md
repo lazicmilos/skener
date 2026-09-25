@@ -117,7 +117,8 @@ domen da čudan rezultat, tačan ulaz koji ga je proizveo stoji sačuvan na disk
 
 | Modul | Odgovornost | Mreža | Disk |
 |---|---|---|---|
-| `cli` | argumenti, ulazni CSV, orkestracija faza | ne | čita |
+| `cli` | argumenti, ulazni CSV, log, izveštaji | ne | čita |
+| `pipeline` | redosled faza: nivo 1 → eskalacija → nivo 2 → bodovanje → rangiranje | kroz `fetch.*` | kroz `store` |
 | `config` | pragovi iz TOML-a, identitet operatera | ne | čita |
 | `models` | šeme podataka, serijalizacija | ne | ne |
 | `fetch.urls`, `fetch.page`, `fetch.robots`, `fetch.sitemap` | normalizacija i parsiranje | delom | ne |
@@ -128,7 +129,9 @@ domen da čudan rezultat, tačan ulaz koji ga je proizveo stoji sačuvan na disk
 | `store`, `report.*` | snapshoti i izveštaji | ne | piše |
 
 `checks.*` ne uvozi `httpx`, `playwright` ni `fetch.*`, osim `fetch.urls`. Ako proveri zatreba nešto
-sa mreže, znači da u snapshotu fali polje, pa se dodaje polje.
+sa mreže, znači da u snapshotu fali polje, pa se dodaje polje. `cli` ne uvozi `fetch.http`,
+`fetch.browser` ni `score`: redosled faza postoji samo u `pipeline`-u, pa ga web aplikacija zove, a
+ne kopira ([ADR-008](docs/adr/ADR-008-pipeline.md)). Oba pravila proverava `tests/test_arhitektura.py`.
 
 ## Provere
 

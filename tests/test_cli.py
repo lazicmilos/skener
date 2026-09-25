@@ -386,6 +386,29 @@ def test_scan_auto_salje_na_nivo_2_samo_kandidate(tmp_path):
     assert list((out / "snapshots").glob("*/browser.json")), "snapshot nivoa 2 mora na disk"
 
 
+def test_bez_playwright_nivo_2_se_preskace_uz_poruku(tmp_path, monkeypatch, caplog):
+    """`pip install skener` bez `[browser]`: nivo 1 radi, a nivo 2 se preskače uz razlog.
+
+    CLI je hvatao `ImportError` samo pri uvozu modula `fetch.browser`, a on se uvozi i
+    bez Playwright-a. Playwright se uvozi tek u `capture_all`, pa je prolaz pucao.
+    """
+    import sys
+
+    monkeypatch.setitem(sys.modules, "playwright.async_api", None)
+    config = tmp_path / "brzo.toml"
+    config.write_text("[http]\ndelay_ms = [0, 0]\n", encoding="utf-8")
+    with FakeSite() as site:
+        domains = tmp_path / "d.csv"
+        domains.write_text(f"domain,industry\n{site.base_url},ostalo\n", encoding="utf-8")
+        out = tmp_path / "izvestaj"
+        argumenti = ["scan", str(domains), "--out", str(out), "--level", "2", "--config", str(config)]
+        assert cli.main(argumenti) == 0
+
+    redovi = list(csv.DictReader((out / "summary.csv").open(encoding="utf-8")))
+    assert redovi[0]["level2_ran"] == "0"
+    assert "Playwright nije instaliran" in caplog.text
+
+
 @pytest.mark.browser
 def test_record_nivo_2_snima_i_browser_snapshot(tmp_path):
     config = tmp_path / "brzo.toml"

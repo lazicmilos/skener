@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gc
 import logging
 import os
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -377,14 +378,21 @@ async def _capture_within_limit(
         slot.release()
 
 
-def _tiho_za_zatvoren_kontekst(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+def _tiho_za_zatvoren_kontekst(prethodni: Callable | None) -> Callable:
     """Posle tvrdog limita Playwright-ova navigacija ostane bez čitaoca; kad se kontekst
     zatvori, njena greška je očekivana posledica prekida, ne kvar (BUG-007). Sve ostalo
-    ide dalje kao i do sada.
+    ide rukovaocu koji je bio postavljen pre nivoa 2.
     """
-    if type(context.get("exception")).__name__ == "TargetClosedError":
-        return
-    loop.default_exception_handler(context)
+
+    def handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        if type(context.get("exception")).__name__ == "TargetClosedError":
+            return
+        if prethodni is not None:
+            prethodni(loop, context)
+        else:
+            loop.default_exception_handler(context)
+
+    return handler
 
 
 def _launch_options(config: dict) -> dict[str, Any]:
@@ -394,23 +402,46 @@ def _launch_options(config: dict) -> dict[str, Any]:
 
 
 async def capture_all(
-    sites: Iterable[SiteSnapshot], config: dict, snapshot_dir: Path | None = None
+    sites: Iterable[SiteSnapshot],
+    config: dict,
+    snapshot_dir: Path | None = None,
+    on_done: Callable[[BrowserSnapshot], None] | None = None,
 ) -> dict[str, BrowserSnapshot]:
-    """Jedna instanca browsera za ceo prolaz, nov kontekst po domenu (§7.1)."""
-    from playwright.async_api import async_playwright
+    """Jedna instanca browsera za ceo prolaz, nov kontekst po domenu (§7.1).
 
+    `on_done` se zove za svaki završen domen, posle upisa na disk.
+    """
     sites = list(sites)
     if not sites:
         return {}
+
+    loop = asyncio.get_running_loop()
+    prethodni = loop.get_exception_handler()
+    loop.set_exception_handler(_tiho_za_zatvoren_kontekst(prethodni))
+    try:
+        return await _capture_all(sites, config, snapshot_dir, on_done)
+    finally:
+        # Zaostale greške zatvorenih konteksta stižu kad sakupljač smeća pokupi napuštene
+        # future-e. Zato se to radi ovde, dok je rukovalac još postavljen (BUG-007), a
+        # posle toga petlja dobija nazad svoj: u procesu koji dugo živi nivo 2 ne sme
+        # trajno da menja globalno stanje.
+        gc.collect()
+        loop.set_exception_handler(prethodni)
+
+
+async def _capture_all(
+    sites: list[SiteSnapshot],
+    config: dict,
+    snapshot_dir: Path | None,
+    on_done: Callable[[BrowserSnapshot], None] | None,
+) -> dict[str, BrowserSnapshot]:
+    from playwright.async_api import async_playwright
 
     results: dict[str, BrowserSnapshot] = {}
     # Nivo 2 ide na 3 istovremena konteksta, ne 8: svaki je stotine MB RAM-a (§8.1).
     limit = asyncio.Semaphore(get(config, "browser.concurrency"))
     # Učitava se jedan po jedan; ostatak merenja ide paralelno (BUG-006).
     load_lock = asyncio.Lock()
-    # Petlja pripada ovom prolazu (`asyncio.run` po nivou), pa se rukovalac ne vraća:
-    # zaostale greške stižu i posle povratka, kad ih sakupljač smeća pokupi.
-    asyncio.get_running_loop().set_exception_handler(_tiho_za_zatvoren_kontekst)
 
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(**_launch_options(config))
@@ -429,6 +460,8 @@ async def capture_all(
                         snapshot.timing.reached,
                         extra={"domain": site.domain},
                     )
+                    if on_done is not None:
+                        on_done(snapshot)
                     return site.domain, snapshot
 
             gathered = await asyncio.gather(*(one(s) for s in sites), return_exceptions=True)

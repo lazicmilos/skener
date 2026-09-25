@@ -352,6 +352,42 @@ def test_prekid_posle_tvrdog_limita_ne_ostavlja_gresku_u_logu(caplog):
     assert not zaostale, zaostale
 
 
+def test_rukovalac_izuzetaka_se_vraca_posle_nivoa_2():
+    """Nivo 2 utišava greške zatvorenih konteksta samo dok traje. Web worker živi dugo,
+    pa njegova petlja posle nivoa 2 mora imati svoj rukovalac, a ne naš."""
+    from skener.fetch.browser import capture_all
+
+    def nas(loop, context):
+        loop.default_exception_handler(context)
+
+    async def glavni(site):
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(nas)
+        fake = SiteSnapshot(
+            domain=site.base_url,
+            pages=[PageSnapshot(url=site.base_url + "/", final_url=site.base_url + "/", status=200)],
+        )
+        await capture_all([fake], load_config())
+        return loop.get_exception_handler()
+
+    with FakeSite() as site:
+        assert asyncio.run(glavni(site)) is nas
+
+
+def test_rukovalac_utisava_samo_zatvoren_kontekst():
+    """Sve osim greške zatvorenog konteksta ide rukovaocu koji je bio pre nivoa 2."""
+    from skener.fetch.browser import _tiho_za_zatvoren_kontekst
+
+    class TargetClosedError(Exception):
+        pass
+
+    primljeno = []
+    rukovalac = _tiho_za_zatvoren_kontekst(lambda _loop, context: primljeno.append(context))
+    rukovalac(None, {"exception": TargetClosedError()})
+    rukovalac(None, {"exception": ValueError("pravi kvar")})
+    assert [type(c["exception"]).__name__ for c in primljeno] == ["ValueError"]
+
+
 def test_stranica_koja_se_ne_otvara_je_failed_sa_razlogom():
     """Greška pri otvaranju koja nije istek (odbijena veza) → `failed`, ne pad."""
     from skener.fetch.browser import capture_all

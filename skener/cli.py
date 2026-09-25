@@ -1,4 +1,7 @@
-"""Komandna linija i orkestracija faza (§11). Sam ne dodiruje ni mrežu ni logiku."""
+"""Komandna linija (§11): argumenti, ulazni CSV, logovanje i izveštaji.
+
+Prolaz vodi `skener.pipeline`; CLI ne dodiruje ni mrežu ni logiku.
+"""
 
 from __future__ import annotations
 
@@ -13,12 +16,12 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-from skener import __version__, store
+from skener import __version__, pipeline
 from skener.checks import registry
-from skener.config import ConfigError, load_config, user_agent
-from skener.models import INDUSTRIES, DomainInput, SiteSnapshot
+from skener.config import ConfigError, load_config
+from skener.inputs import InputError
+from skener.models import INDUSTRIES, DomainInput, Event, ScanResult
 from skener.report import csv_out, html_out
-from skener.score import analyze, escalation_reasons, rank, select_for_level2
 
 log = logging.getLogger("skener")
 
@@ -65,6 +68,16 @@ class OnlyDomain(logging.Filter):
         if record.levelno > logging.DEBUG:
             return True
         return getattr(record, "domain", None) == self.domain
+
+
+FAZE = {"level1": "nivo 1", "level2": "nivo 2"}
+
+
+def log_event(event: Event) -> None:
+    """Brojač „43/200" za prolaz koji traje minutima. `recheck` traje sekundu i ne treba mu."""
+    if event.kind == "domain_finished" and event.phase in FAZE:
+        faza = FAZE[event.phase]
+        log.info("%s: %d/%d gotovo", faza, event.done, event.total, extra={"domain": event.domain})
 
 
 def setup_logging(debug_domain: str | None) -> None:
@@ -148,8 +161,6 @@ def read_domains(path: Path, only: Sequence[str] = ()) -> list[DomainInput]:
 # scan
 # --------------------------------------------------------------------------- #
 def cmd_scan(args: argparse.Namespace) -> int:
-    from skener.fetch.http import scan_domains
-
     config = load_config(args.config)
     if args.concurrency:
         # Oba zajedno: više domena u radu nego slotova znači da budžet domena opet
@@ -158,64 +169,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
         config["http"]["domain_concurrency"] = args.concurrency
     if args.max_level2 is not None:
         config["escalation"]["max_level2"] = args.max_level2
-    user_agent(config)  # bez identiteta operatera nema ni jednog zahteva
 
     targets = read_domains(Path(args.domains), args.only)
     snapshots_dir = Path(args.snapshots or Path(args.out) / "snapshots")
-    started = time.monotonic()
-
-    log.info("nivo 1: %d domena", len(targets))
-    sites = asyncio.run(scan_domains(targets, config, snapshot_dir=snapshots_dir))
-
-    browsers, reasons = _run_level2(sites, config, args, snapshots_dir)
-    reports = rank(
-        [
-            analyze(site, config, browser=browsers.get(site.domain), escalation=reasons.get(site.domain, []))
-            for site in sites
-        ]
+    result = asyncio.run(
+        pipeline.scan(targets, config, level=args.level, snapshot_dir=snapshots_dir, on_event=log_event)
     )
-    _emit(reports, config, args, duration_s=time.monotonic() - started)
+    _emit(result, config, args)
     return 0
 
 
-def _run_level2(
-    sites: Sequence[SiteSnapshot], config: dict, args: argparse.Namespace, snapshots_dir: Path
-) -> tuple[dict, dict[str, list[str]]]:
-    """Eskalacija (§6) pa nivo 2 nad izabranima; vraća i razloge za izveštaj."""
-    if args.level == "1":
-        return {}, {}
-
-    registry.load_all()
-    candidates: list[tuple[SiteSnapshot, list]] = []
-    reasons: dict[str, list[str]] = {}
-    for site in sites:
-        ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)
-        results = registry.run(1, site, ctx)
-        why = escalation_reasons(site, results, config)
-        if why or args.level == "2":
-            candidates.append((site, results))
-            reasons[site.domain] = why or ["izričito traženo preko --level 2"]
-
-    chosen = select_for_level2(candidates, config)
-    log.info(
-        "nivo 2: %d kandidata, %d prolazi, %d preko limita",
-        len(candidates),
-        len(chosen),
-        len(candidates) - len(chosen),
-    )
-    if not chosen:
-        return {}, reasons
-
-    try:
-        from skener.fetch.browser import capture_all
-    except ImportError:
-        log.error("Playwright nije instaliran; nivo 2 se preskače (pip install 'skener[browser]')")
-        return {}, reasons
-
-    return asyncio.run(capture_all(chosen, config, snapshot_dir=snapshots_dir)), reasons
-
-
-def _emit(reports, config, args, duration_s: float | None = None) -> None:
+def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
+    reports = result.ranked
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     formats = {f.strip() for f in args.format.split(",") if f.strip()}
@@ -224,7 +189,7 @@ def _emit(reports, config, args, duration_s: float | None = None) -> None:
         csv_out.write_findings(out / "findings.csv", reports, bom=args.csv_bom)
         csv_out.write_summary(out / "summary.csv", reports, bom=args.csv_bom)
     if "html" in formats:
-        html_out.write(out / "index.html", reports, config, duration_s=duration_s)
+        html_out.write(out / "index.html", reports, config, duration_s=result.duration_s["total"])
 
     nalaza = sum(len(r.findings) for r in reports)
     print(f"\n{len(reports)} domena · {nalaza} nalaza · izlaz u {out}/", file=sys.stderr)
@@ -242,16 +207,7 @@ def _emit(reports, config, args, duration_s: float | None = None) -> None:
 # --------------------------------------------------------------------------- #
 def cmd_recheck(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    started = time.monotonic()
-    reports = []
-    for site, browser in store.read_all(Path(args.snapshots)):
-        registry.load_all()
-        ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)
-        reasons = escalation_reasons(site, registry.run(1, site, ctx), config)
-        reports.append(analyze(site, config, browser=browser, escalation=reasons))
-    if not reports:
-        raise SystemExit(f"{args.snapshots}: nijedan snapshot nije pronađen")
-    _emit(rank(reports), config, args, duration_s=time.monotonic() - started)
+    _emit(pipeline.recheck(Path(args.snapshots), config, on_event=log_event), config, args)
     return 0
 
 
@@ -259,30 +215,11 @@ def cmd_recheck(args: argparse.Namespace) -> int:
 # record — snima fixture-e (§12.2)
 # --------------------------------------------------------------------------- #
 def cmd_record(args: argparse.Namespace) -> int:
-    from skener.fetch.http import scan_domains
-
     config = load_config(args.config)
-    user_agent(config)  # bez identiteta operatera nema ni jednog zahteva
     targets = read_domains(Path(args.domains), args.only)
     out = Path(args.out)
-    sites = asyncio.run(scan_domains(targets, config))
-
-    for site in sites:
-        # Bez sirovog HTML-a ostalih strana, inače repo naraste (§12.2).
-        for page in site.pages[1:]:
-            page.raw_html = None
-        store.write_site(out, site, compress=True)
-
-    if args.level != "1":
-        try:
-            from skener.fetch.browser import capture_all
-        except ImportError:
-            log.error("Playwright nije instaliran; snimam samo nivo 1")
-        else:
-            for snapshot in asyncio.run(capture_all(sites, config)).values():
-                store.write_browser(out, snapshot, compress=True)
-
-    print(f"snimljeno {len(sites)} snapshota u {out}/", file=sys.stderr)
+    broj = asyncio.run(pipeline.record(targets, config, out_dir=out, level=args.level))
+    print(f"snimljeno {broj} snapshota u {out}/", file=sys.stderr)
     return 0
 
 
@@ -402,6 +339,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return args.func(args)
     except ConfigError as exc:
         raise SystemExit(f"greška u konfiguraciji: {exc}") from exc
+    except InputError as exc:
+        raise SystemExit(str(exc)) from exc
     except KeyboardInterrupt:
         return 130
 

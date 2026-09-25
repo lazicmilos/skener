@@ -16,7 +16,7 @@ import random
 import socket
 import ssl
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -524,9 +524,15 @@ async def _probe_soft404(
 # Prolaz nad listom domena
 # --------------------------------------------------------------------------- #
 async def scan_domains(
-    targets: Iterable[DomainInput], config: dict, snapshot_dir: Path | None = None
+    targets: Iterable[DomainInput],
+    config: dict,
+    snapshot_dir: Path | None = None,
+    on_done: Callable[[SiteSnapshot], None] | None = None,
 ) -> list[SiteSnapshot]:
-    """Snapshot ide na disk čim je domen gotov — ako proces pukne na 190., imaš 189 (§8.2)."""
+    """Snapshot ide na disk čim je domen gotov — ako proces pukne na 190., imaš 189 (§8.2).
+
+    `on_done` se zove za svaki završen domen, posle upisa na disk.
+    """
     targets = list(targets)
     results: list[SiteSnapshot] = []
     # Budžet od 25 s je za rad na domenu, ne za čekanje u redu iza ostalih 199:
@@ -556,6 +562,8 @@ async def scan_domains(
                     snapshot.budget.requests_made,
                     extra={"domain": target.domain},
                 )
+                if on_done is not None:
+                    on_done(snapshot)
                 return snapshot
 
         # Goli `gather` bi jednim izuzetkom oborio ceo prolaz — tačno greška iz §8.2.

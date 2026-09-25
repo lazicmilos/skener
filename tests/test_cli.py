@@ -253,6 +253,22 @@ def test_scan_bez_identiteta_odbija_pre_ijednog_zahteva(tmp_path, monkeypatch):
         assert site.requests == [], f"zahtevi pre provere identiteta: {site.requests}"
 
 
+def test_verzija_je_ista_u_paketu_cli_i_user_agentu(capsys, monkeypatch):
+    """Administrator sajta vidi verziju u User-Agent-u, pa ona mora biti ona koja stvarno radi."""
+    from importlib.metadata import version
+
+    from skener import __version__
+    from skener.config import user_agent
+
+    assert version("skener") == __version__, "pyproject.toml čita verziju iz skener/__init__.py"
+    with pytest.raises(SystemExit):
+        cli.main(["--version"])
+    assert capsys.readouterr().out.strip() == f"skener {__version__}"
+    monkeypatch.setenv("SKENER_NAZIV", "Web studio Primer")
+    monkeypatch.setenv("SKENER_KONTAKT", "kontakt@primer.rs")
+    assert f"/{__version__} " in user_agent(load_config())
+
+
 # --------------------------------------------------------------------------- #
 # Pogađanje grešaka: lista iz Excel-a na srpskom Windows-u. Kupac nije programer.
 # --------------------------------------------------------------------------- #

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skener"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Skener sajtova — rangira domene po tome koji zaslužuju pun ručni audit"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,6 +25,9 @@ skener = "skener.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["skener*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "skener.__version__" }
 
 
 [tool.pytest.ini_options]

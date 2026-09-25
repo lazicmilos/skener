@@ -77,6 +77,14 @@ FINDINGS: dict[str, dict] = {
             "especially on a phone."
         ),
         "tech": "load_ms={load_ms}, reached={reached}",
+        "variants": {
+            "timeout": {
+                "client": (
+                    "The home page did not finish loading even in {sekundi} s. Many visitors do not "
+                    "wait that long, especially on a phone."
+                )
+            }
+        },
     },
     "perf.img.oversized": {
         "client": (

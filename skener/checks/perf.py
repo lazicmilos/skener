@@ -207,6 +207,8 @@ def load_time(snapshot, ctx: Context):
             severity="high",
             evidence={"load_ms": None, "sekundi": limit_s, "reached": "timeout"},
             urls=[snapshot.url],
+            # Ne „treba joj 25 s": ne zna se koliko joj treba, samo da je više od toga.
+            variant="timeout",
         )
     if timing.load_ms is None:
         return unknown(load_time.spec, "load_not_measured")

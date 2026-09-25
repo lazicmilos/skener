@@ -372,3 +372,20 @@ def test_dokaz_kaze_odakle_je_uzorak(izvor, sr_tekst):
     nalaz = run_level(1, site)["seo.canonical.duplicate"].findings[0]
     assert nalaz.evidence["uzorak"] == izvor, "u dokazu je kod; tekst daje katalog"
     assert sr_tekst in render(nalaz, "sr").tech
+
+
+@pytest.mark.parametrize(
+    "lang, ocekivano, netacno",
+    [
+        pytest.param("sr", "se ni za 25 s nije do kraja učitala", "treba 25 s", id="sr"),
+        pytest.param("en", "did not finish loading even in 25 s", "needs 25 s", id="en"),
+    ],
+)
+def test_prekid_ucitavanja_ne_tvrdi_koliko_traje(lang, ocekivano, netacno):
+    """Stranica koja ne stigne do `load` za 25 s ne učitava se 25 s nego duže, koliko ne znamo."""
+    browser = clean_browser()
+    browser.timing.reached = "timeout"
+    browser.timing.load_ms = None
+    nalaz = run_level(2, browser)["perf.load.time"].findings[0]
+    poruka = render(nalaz, lang).client
+    assert ocekivano in poruka and netacno not in poruka, poruka

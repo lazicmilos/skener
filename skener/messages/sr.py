@@ -91,6 +91,14 @@ FINDINGS: dict[str, dict] = {
             "toliko, naročito na telefonu."
         ),
         "tech": "load_ms={load_ms}, reached={reached}",
+        "variants": {
+            "timeout": {
+                "client": (
+                    "Početna strana se ni za {sekundi} s nije do kraja učitala. Mnogi posetioci ne "
+                    "čekaju toliko, naročito na telefonu."
+                )
+            }
+        },
     },
     "perf.img.oversized": {
         "client": (

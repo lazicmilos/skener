@@ -542,7 +542,7 @@
   "slucaj": "posebno/prekid-ucitavanja",
   "check_id": "perf.load.time",
   "severity": "high",
-  "client": "Početnoj strani treba 25 s da se do kraja učita. Mnogi posetioci ne čekaju toliko, naročito na telefonu.",
+  "client": "Početna strana se ni za 25 s nije do kraja učitala. Mnogi posetioci ne čekaju toliko, naročito na telefonu.",
   "tech": "load_ms=None, reached=timeout"
  },
  {

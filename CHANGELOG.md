@@ -47,6 +47,8 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Ispravljeno
 
+- Kad početna ne stigne do `load` za 25 s, rečenica je tvrdila „treba joj 25 s da se do kraja
+  učita", a treba joj više. Sada kaže da se ni za 25 s nije do kraja učitala.
 - U HTML izveštaju je pisalo „1 nalaza"; sada se broj i imenica slažu („1 nalaz", „3 nalaza").
 - Bez instaliranog Playwright-a (`pip install skener` bez `[browser]`) prolaz sa nivoom 2 je
   pucao. Sada se nivo 2 preskače uz poruku, a nivo 1 radi.

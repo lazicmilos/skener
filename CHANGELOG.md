@@ -30,6 +30,9 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 - JSON izveštaj `report.json` sa verzijom šeme (`skener/schema/report-2.json`), otiskom
   konfiguracije i okruženjem. `--format` ga podrazumevano piše uz HTML i CSV.
 - Snapshot nivoa 2 beleži verziju Chromium-a kojim je meren.
+- Izuzeti domeni: `[identitet] izuzeti` ili `--exclude FILE`, jedan domen po redu, uz sve
+  poddomene. Izuzet domen ne dobija nijedan zahtev; u izveštaju je samo njihov broj (status
+  `excluded` u zbiru).
 - Izveštaji na srpskom i engleskom: `--lang sr|en` za `scan` i `recheck`. `skener explain`
   ispisuje rečenice na oba jezika.
 - Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija

@@ -113,7 +113,12 @@ def email_draft(report: DomainReport, lang: str = "sr") -> str:
 
 
 def render(
-    reports: Sequence[DomainReport], config: dict, *, duration_s: float | None = None, lang: str = "sr"
+    reports: Sequence[DomainReport],
+    config: dict,
+    *,
+    duration_s: float | None = None,
+    excluded: int = 0,
+    lang: str = "sr",
 ) -> str:
     def t(key: str, **values) -> str:
         return _e(text(key, lang, **values))
@@ -131,6 +136,8 @@ def render(
         (t("card_failed"), failed),
         (t("card_level2"), level2),
     ]
+    if excluded:
+        cards.append((t("card_excluded"), excluded))
     if duration_s is not None:
         trajanje = f"{duration_s:.1f} s" if duration_s < 10 else f"{duration_s:.0f} s"
         cards.append((t("card_duration"), trajanje))

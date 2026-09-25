@@ -267,6 +267,7 @@ TEXT: dict[str, str] = {
     "card_partial": "Partial",
     "card_failed": "Failed",
     "card_level2": "On level 2",
+    "card_excluded": "Excluded on request",
     "card_duration": "Duration",
     "ranked": "Ranked domains",
     "ranked_note": (

@@ -16,8 +16,8 @@ from pathlib import Path
 
 from skener import __version__, pipeline
 from skener.checks import registry
-from skener.config import ConfigError, load_config
-from skener.inputs import InputError, read_domain_list
+from skener.config import ConfigError, get, load_config
+from skener.inputs import InputError, read_domain_list, read_exclusions
 from skener.messages import LANGS, catalog, templates
 from skener.models import DomainInput, Event, ScanResult
 from skener.report import csv_out, html_out, json_out
@@ -121,6 +121,18 @@ def read_domains(path: Path, only: Sequence[str] = ()) -> list[DomainInput]:
     return rows
 
 
+def read_excluded(config: dict, args: argparse.Namespace) -> list[str]:
+    """Domeni iz `[identitet] izuzeti` i iz `--exclude`; oba važe."""
+    domeni: list[str] = []
+    for putanja in (get(config, "identitet.izuzeti"), getattr(args, "exclude", None)):
+        if not putanja:
+            continue
+        if not Path(putanja).is_file():
+            raise InputError(f"{putanja}: fajl sa izuzetim domenima ne postoji")
+        domeni += read_exclusions(Path(putanja).read_bytes())
+    return domeni
+
+
 # --------------------------------------------------------------------------- #
 # scan
 # --------------------------------------------------------------------------- #
@@ -137,7 +149,14 @@ def cmd_scan(args: argparse.Namespace) -> int:
     targets = read_domains(Path(args.domains), args.only)
     snapshots_dir = Path(args.snapshots or Path(args.out) / "snapshots")
     result = asyncio.run(
-        pipeline.scan(targets, config, level=args.level, snapshot_dir=snapshots_dir, on_event=log_event)
+        pipeline.scan(
+            targets,
+            config,
+            level=args.level,
+            snapshot_dir=snapshots_dir,
+            excluded=read_excluded(config, args),
+            on_event=log_event,
+        )
     )
     _emit(result, config, args)
     return 0
@@ -154,7 +173,12 @@ def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
         csv_out.write_summary(out / "summary.csv", reports, bom=args.csv_bom)
     if "html" in formats:
         html_out.write(
-            out / "index.html", reports, config, duration_s=result.duration_s["total"], lang=args.lang
+            out / "index.html",
+            reports,
+            config,
+            duration_s=result.duration_s["total"],
+            excluded=result.summary.get("excluded", 0),
+            lang=args.lang,
         )
     if "json" in formats:
         json_out.write(out / "report.json", result)
@@ -186,7 +210,8 @@ def cmd_record(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     targets = read_domains(Path(args.domains), args.only)
     out = Path(args.out)
-    broj = asyncio.run(pipeline.record(targets, config, out_dir=out, level=args.level))
+    excluded = read_excluded(config, args)
+    broj = asyncio.run(pipeline.record(targets, config, out_dir=out, level=args.level, excluded=excluded))
     print(f"snimljeno {broj} snapshota u {out}/", file=sys.stderr)
     return 0
 
@@ -274,6 +299,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument(
         "--only", action="append", default=[], metavar="DOMAIN", help="samo ovaj domen; može više puta"
     )
+    scan.add_argument("--exclude", metavar="FILE", help="domeni koji se ne skeniraju, jedan po redu")
     add_common(scan)
     scan.set_defaults(func=cmd_scan)
 
@@ -289,6 +315,7 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--out", required=True, metavar="DIR")
     record.add_argument("--level", choices=["1", "2", "auto"], default="auto")
     record.add_argument("--only", action="append", default=[], metavar="DOMAIN")
+    record.add_argument("--exclude", metavar="FILE")
     record.add_argument("--config", metavar="FILE")
     record.add_argument("--debug-domain", metavar="DOMAIN")
     record.set_defaults(func=cmd_record)

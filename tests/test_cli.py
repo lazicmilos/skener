@@ -35,6 +35,34 @@ def test_upozorenja_iz_liste_idu_u_log_sa_brojem_reda(tmp_path, caplog):
     assert "red 3: domen se ponavlja" in caplog.text
 
 
+def test_izuzeti_iz_konfiguracije_i_sa_komandne_linije(tmp_path):
+    """Oba izvora važe; u izveštaju je samo broj izuzetih, bez imena."""
+    with FakeSite() as prvi:
+        host, port = prvi.address
+        domains = tmp_path / "d.csv"
+        domains.write_text(f"domain,industry\n{prvi.base_url},ostalo\n", encoding="utf-8")
+        iz_konfiguracije = tmp_path / "izuzeti.txt"
+        iz_konfiguracije.write_text("# pisali 25.09.\nnekidrugi.rs\n", encoding="utf-8")
+        sa_komandne_linije = tmp_path / "jos.txt"
+        sa_komandne_linije.write_text(f"{host}\n", encoding="utf-8")
+        config = tmp_path / "moj.toml"
+        config.write_text(f'[identitet]\nizuzeti = "{iz_konfiguracije.as_posix()}"\n', encoding="utf-8")
+        out = tmp_path / "izlaz"
+        argumenti = ["--config", str(config), "--exclude", str(sa_komandne_linije), "--level", "1"]
+        assert cli.main(["scan", str(domains), "--out", str(out), *argumenti]) == 0
+    assert prvi.requests == []
+    assert json.loads((out / "report.json").read_text(encoding="utf-8"))["summary"]["excluded"] == 1
+    stranica = (out / "index.html").read_text(encoding="utf-8")
+    assert "Izuzeto na zahtev" in stranica and prvi.base_url not in stranica
+
+
+def test_nepostojeci_fajl_sa_izuzetima_puca_razumljivo(tmp_path):
+    domains = tmp_path / "d.csv"
+    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    with pytest.raises(SystemExit, match="fajl sa izuzetim domenima ne postoji"):
+        cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), "--exclude", "nema.txt"])
+
+
 def test_greska_u_listi_je_poruka_a_ne_traceback(tmp_path):
     path = tmp_path / "d.csv"
     path.write_text("sajt,industry\na.rs,hotel\n", encoding="utf-8")

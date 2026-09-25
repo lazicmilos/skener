@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from skener.inputs import InputError, read_domain_list, read_excel_csv
+from skener.inputs import InputError, is_excluded, read_domain_list, read_excel_csv, read_exclusions
 
 
 def procitaj(sadrzaj: str | bytes):
@@ -92,3 +92,41 @@ def test_broj_reda_je_red_u_excelu(sadrzaj, redovi):
 def test_zaglavlje_posle_praznog_reda():
     tabela = read_excel_csv(b"\ndomain;industry\na.rs;hotel\n", "d.csv")
     assert tabela.header_row == 2 and tabela.rows == [(3, {"domain": "a.rs", "industry": "hotel"})]
+
+
+# --------------------------------------------------------------------------- #
+# Izuzeti domeni (opt-out)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("domen", "izuzet"),
+    [
+        pytest.param("x.rs", True, id="ke-isti-host"),
+        pytest.param("www.x.rs", True, id="ke-www"),
+        pytest.param("blog.x.rs", True, id="ke-poddomen"),
+        pytest.param("https://shop.x.rs/putanja", True, id="ke-pun-url"),
+        pytest.param("X.RS", True, id="pg-velika-slova"),
+        pytest.param("x.rs.", True, id="pg-tacka-na-kraju"),
+        pytest.param("nex.rs", False, id="gv-sufiks-bez-tacke"),
+        pytest.param("x.rs.zlo.com", False, id="pg-x.rs-na-pocetku-tudjeg-domena"),
+        pytest.param("y.rs", False, id="ke-drugi-domen"),
+    ],
+)
+def test_izuzece_vazi_za_poddomene(domen, izuzet):
+    assert is_excluded(domen, ["x.rs"]) is izuzet
+
+
+def test_co_rs_nije_izuzet_kad_je_izuzeta_firma_co_rs():
+    """Bez Public Suffix liste „registrovani domen" od `firma.co.rs` bi bio `co.rs`."""
+    izuzeti = ["firma.co.rs"]
+    assert is_excluded("firma.co.rs", izuzeti) and is_excluded("www.firma.co.rs", izuzeti)
+    assert not is_excluded("co.rs", izuzeti) and not is_excluded("druga.co.rs", izuzeti)
+
+
+def test_www_u_unosu_izuzima_celu_firmu():
+    assert is_excluded("x.rs", ["www.x.rs"]) and is_excluded("blog.x.rs", ["https://www.x.rs/"])
+
+
+def test_fajl_sa_izuzetim_domenima():
+    data = "\ufeffx.rs\n\n# ko je tražio i kada\ny.rs  # posle tarabe je komentar\n   \n".encode()
+    assert read_exclusions(data) == ["x.rs", "y.rs"]
+    assert not is_excluded("x.rs", read_exclusions(b"# samo komentar\n"))

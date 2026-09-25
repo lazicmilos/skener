@@ -8,6 +8,9 @@
 # skenira. Upiši ih u svoj --config fajl ili postavi SKENER_NAZIV i SKENER_KONTAKT.
 naziv = ""                      # npr. "Web studio Primer"
 kontakt = ""                    # mejl ili adresa sajta na kojoj te administrator nalazi
+# Administrator koji na taj kontakt napiše „ne skenirajte nas" poštuje se od sledećeg prolaza.
+# Fajl sa jednim domenom po redu; izuzima se i svaki poddomen. Isto može `--exclude FILE`.
+izuzeti = ""                    # npr. "/rad/izuzeti.txt"
 
 [http]
 concurrency = 8                 # globalni semafor (§8.1)

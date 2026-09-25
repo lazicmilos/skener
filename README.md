@@ -287,6 +287,11 @@ User-Agent predstavlja onoga ko pokreće alat, a ne autora alata.
 - Tvrd budžet po domenu je 16 zahteva i 40 sekundi. Budžet od 25 s nije bio dovoljan za spor deljeni
   hosting, gde jedna strana odgovara i po tri sekunde. Broj zahteva je ostao isti.
 - Na `429` ili `503` alat odustaje od domena za taj prolaz, bez ponovnog pokušaja.
+- Administrator koji na kontakt iz User-Agent-a napiše „ne skenirajte nas" poštuje se od
+  sledećeg prolaza. Njegov domen ide u fajl izuzetih (jedan po redu, `#` za komentar), a fajl se
+  navodi u `[identitet] izuzeti` ili sa `--exclude`. Izuzima se i svaki poddomen: unos `firma.rs`
+  važi i za `www.firma.rs` i za `blog.firma.rs`. Izuzet domen ne dobija nijedan zahtev, a u
+  izveštaju je samo broj izuzetih, bez imena.
 
 ### Privatne adrese se ne otvaraju
 

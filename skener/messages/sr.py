@@ -277,6 +277,7 @@ TEXT: dict[str, str] = {
     "card_partial": "Delimično",
     "card_failed": "Neuspešno",
     "card_level2": "Na nivou 2",
+    "card_excluded": "Izuzeto na zahtev",
     "card_duration": "Trajanje",
     "ranked": "Rangirani domeni",
     "ranked_note": (

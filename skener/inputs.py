@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 from skener.models import INDUSTRIES, DomainInput
 
@@ -95,3 +97,33 @@ def read_domain_list(data: bytes, source: str) -> tuple[list[DomainInput], list[
     if not domains:
         raise InputError(f"{source}: nijedan domen nije učitan")
     return domains, warnings
+
+
+# --------------------------------------------------------------------------- #
+# Izuzeti domeni: administrator koji napiše „ne skenirajte nas" poštuje se od sledećeg prolaza
+# --------------------------------------------------------------------------- #
+def read_exclusions(data: bytes) -> list[str]:
+    """Jedan domen po redu; prazni redovi i ono posle `#` se preskaču."""
+    tekst = data.decode("utf-8-sig", errors="replace")
+    redovi = (red.split("#", 1)[0].strip() for red in tekst.splitlines())
+    return [red for red in redovi if red]
+
+
+def _host(domain: str) -> str:
+    host = urlsplit(domain if "://" in domain else f"//{domain}").hostname or ""
+    return host.rstrip(".").removeprefix("www.")
+
+
+def is_excluded(domain: str, exclusions: Iterable[str]) -> bool:
+    """Host je jednak unosu ili je njegov poddomen: unos `x.rs` izuzima i `www.x.rs` i `blog.x.rs`.
+
+    Bez „registrovanog domena": bez Public Suffix liste bi `firma.co.rs` postao `co.rs`, pa
+    bi jedan zahtev izuzeo sve firme sa `.co.rs`. Vodeće `www.` se skida i sa unosa, jer
+    administrator koji napiše `www.firma.rs` traži da se ne skenira firma.
+    """
+    host = _host(domain)
+    for entry in exclusions:
+        izuzet = _host(entry)
+        if izuzet and (host == izuzet or host.endswith("." + izuzet)):
+            return True
+    return False

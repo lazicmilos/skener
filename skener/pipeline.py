@@ -23,7 +23,7 @@ from skener.checks import registry
 from skener.config import digest, user_agent
 from skener.fetch.browser import capture_all
 from skener.fetch.http import scan_domains
-from skener.inputs import InputError
+from skener.inputs import InputError, is_excluded
 from skener.models import (
     BrowserSnapshot,
     DomainInput,
@@ -84,9 +84,14 @@ async def scan(
     *,
     level: str = "auto",
     snapshot_dir: Path | None = None,
+    excluded: Sequence[str] = (),
     on_event: OnEvent | None = None,
 ) -> ScanResult:
-    """Pun prolaz nad listom domena. Snapshot svakog domena ide na disk čim je gotov."""
+    """Pun prolaz nad listom domena. Snapshot svakog domena ide na disk čim je gotov.
+
+    `excluded` su domeni čiji je administrator tražio da se ne skeniraju. Ne dobijaju
+    nijedan zahtev, a u rezultatu je samo njihov broj.
+    """
     if level not in LEVELS:
         raise ValueError(f"nivo mora biti jedan od {LEVELS}, a jeste {level!r}")
     targets = list(targets)
@@ -94,6 +99,7 @@ async def scan(
         raise InputError("lista domena je prazna")
     user_agent(config)  # bez identiteta operatera nema nijednog zahteva
     started_at, t0 = _now(), time.monotonic()
+    targets, izuzeto = _bez_izuzetih(targets, excluded)
 
     log.info("nivo 1: %d domena", len(targets))
     progress = _Progress(on_event, "level1", len(targets))
@@ -115,7 +121,15 @@ async def scan(
         for site in sites
     ]
     durations = {"level1": t1 - t0, "level2": t2 - t1, "total": time.monotonic() - t0}
-    return _result(reports, started_at, durations, config, browsers.values())
+    return _result(reports, started_at, durations, config, browsers.values(), excluded=izuzeto)
+
+
+def _bez_izuzetih(targets: list[DomainInput], excluded: Sequence[str]) -> tuple[list[DomainInput], int]:
+    ostali = [t for t in targets if not is_excluded(t.domain, excluded)]
+    izuzeto = len(targets) - len(ostali)
+    if izuzeto:
+        log.info("izuzeto na zahtev administratora: %d domena", izuzeto)
+    return ostali, izuzeto
 
 
 def _level1_status(site: SiteSnapshot) -> str:
@@ -183,9 +197,12 @@ def _result(
     durations: dict[str, float],
     config: dict,
     browsers: Iterable[BrowserSnapshot],
+    *,
+    excluded: int = 0,
 ) -> ScanResult:
     ranked = rank(reports)
     counts = Counter(report.status for report in ranked)
+    counts["excluded"] = excluded
     return ScanResult(
         started_at=started_at,
         finished_at=_now(),
@@ -231,10 +248,16 @@ def recheck(snapshot_dir: Path, config: dict, *, on_event: OnEvent | None = None
 # record — snima fixture-e (§12.2)
 # --------------------------------------------------------------------------- #
 async def record(
-    targets: Sequence[DomainInput], config: dict, *, out_dir: Path, level: str = "auto"
+    targets: Sequence[DomainInput],
+    config: dict,
+    *,
+    out_dir: Path,
+    level: str = "auto",
+    excluded: Sequence[str] = (),
 ) -> int:
     """Snima gzipovane snapshote svih domena; vraća njihov broj. Nivo 2 ide za sve, bez eskalacije."""
     user_agent(config)  # bez identiteta operatera nema nijednog zahteva
+    targets, _ = _bez_izuzetih(list(targets), excluded)
     sites = await scan_domains(targets, config)
     for site in sites:
         # Bez sirovog HTML-a ostalih strana, inače repo naraste (§12.2).

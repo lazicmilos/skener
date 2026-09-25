@@ -44,8 +44,8 @@ def test_recheck_bez_snapshota_je_greska_ulaza(tmp_path):
 
 def test_rezultat_nosi_zbir_po_statusu_i_vreme():
     rezultat = pipeline.recheck(FIXTURES, load_config())
-    assert set(rezultat.summary) == {"scanned", "partial", "failed"}
-    assert sum(rezultat.summary.values()) == len(rezultat.ranked)
+    assert set(rezultat.summary) == {"scanned", "partial", "failed", "excluded"}
+    assert sum(rezultat.summary.values()) == len(rezultat.ranked), "recheck nema izuzetih"
     assert rezultat.started_at.endswith("Z") and rezultat.finished_at >= rezultat.started_at
     assert rezultat.duration_s["total"] >= 0
 
@@ -147,3 +147,26 @@ def test_otkazan_prolaz_zatvara_browser_i_cuva_zavrsene_snapshote(tmp_path, monk
     assert pokrenuti and not any(b.is_connected() for b in pokrenuti), "browser mora biti zatvoren"
     assert len(list(tmp_path.glob("*/site.json"))) == 2, "nivo 1 je završen za oba domena"
     assert len(list(tmp_path.glob("*/browser.json"))) == 1, "nivo 2 je završen samo za brzi"
+
+
+# --------------------------------------------------------------------------- #
+# Izuzeti domeni (opt-out)
+# --------------------------------------------------------------------------- #
+def test_izuzet_domen_ne_dobija_nijedan_zahtev(monkeypatch):
+    """Lokalni serveri dele host 127.0.0.1, pa je drugi domen u listi ime bez DNS zapisa."""
+    import socket
+
+    from skener.fetch import http
+
+    async def nema_zapisa(host, port):
+        raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+
+    monkeypatch.setattr(http, "_razresi", nema_zapisa)
+    with FakeSite() as izuzet:
+        targets = [DomainInput(izuzet.base_url), DomainInput("drugi.test")]
+        rezultat = asyncio.run(
+            pipeline.scan(targets, brza_konfiguracija(), level="1", excluded=["127.0.0.1"])
+        )
+    assert izuzet.requests == [], "izuzet domen ne sme da dobije nijedan zahtev"
+    assert [r.domain for r in rezultat.ranked] == ["drugi.test"], "u izveštaju nema imena izuzetog"
+    assert rezultat.summary["excluded"] == 1

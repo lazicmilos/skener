@@ -21,7 +21,8 @@ CheckStatus = Literal["ok", "finding", "unknown"]
 Industry = Literal[
     "hotel", "restoran", "zdravstvo", "ecommerce", "b2b", "institucija", "ostalo"
 ]
-DomainStatus = Literal["scanned", "partial", "failed"]
+# `excluded`: administrator je tražio da se sajt ne skenira; u izveštaju je samo njihov broj.
+DomainStatus = Literal["scanned", "partial", "failed", "excluded"]
 
 # JSON izveštaj: dodato polje podiže drugi broj, a obrisano ili promenjeno prvi (README).
 SCHEMA_VERSION = "2.0"

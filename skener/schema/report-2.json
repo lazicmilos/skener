@@ -37,9 +37,9 @@
       }
     },
     "summary": {
-      "description": "Broj domena po statusu.",
+      "description": "Broj domena po statusu; izuzeti domeni su samo broj, bez imena.",
       "type": "object",
-      "required": ["scanned", "partial", "failed"],
+      "required": ["scanned", "partial", "failed", "excluded"],
       "additionalProperties": {"type": "integer", "minimum": 0}
     },
     "ranked": {"type": "array", "items": {"$ref": "#/$defs/domain_report"}}

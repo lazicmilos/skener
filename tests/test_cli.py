@@ -10,39 +10,36 @@ from localserver import FakeSite, Response, html
 
 from skener import cli
 from skener.config import load_config
+from skener.inputs import InputError
 from skener.models import DomainReport, Finding
 from skener.report import csv_out, html_out
 from skener.score import rank
 
 
 # --------------------------------------------------------------------------- #
-# Ulazni CSV (§4.1)
+# Ulazni CSV (§4.1): ovde samo ono što radi CLI — `--only`, log i poruka na izlazu.
+# Čitanje same liste je u test_inputs.py.
 # --------------------------------------------------------------------------- #
-def test_cita_csv_sa_zaglavljem(tmp_path):
-    path = tmp_path / "domains.csv"
-    path.write_text(
-        "domain,industry,note\nmensa.rs,institucija,beleska\nangolo.rs,,\n"
-        "protetica.com,NEPOSTOJECA,\n\n",
-        encoding="utf-8",
-    )
-    rows = cli.read_domains(path)
-    assert [r.domain for r in rows] == ["mensa.rs", "angolo.rs", "protetica.com"]
-    assert rows[0].industry == "institucija" and rows[0].note == "beleska"
-    assert rows[1].industry == "ostalo", "prazna delatnost pada na `ostalo` (§4.1)"
-    assert rows[2].industry == "ostalo", "nepoznata delatnost pada na `ostalo`, ne ruši prolaz"
-
-
 def test_only_filtrira(tmp_path):
     path = tmp_path / "d.csv"
     path.write_text("domain,industry\na.rs,hotel\nb.rs,hotel\n", encoding="utf-8")
     assert [r.domain for r in cli.read_domains(path, ["B.RS"])] == ["b.rs"]
+    with pytest.raises(InputError, match="--only"):
+        cli.read_domains(path, ["c.rs"])
 
 
-def test_csv_bez_kolone_domain_puca_razumljivo(tmp_path):
+def test_upozorenja_iz_liste_idu_u_log_sa_brojem_reda(tmp_path, caplog):
+    path = tmp_path / "d.csv"
+    path.write_text("domain,industry\nmensa.rs,institucija\nMENSA.RS,hotel\n", encoding="utf-8")
+    cli.read_domains(path)
+    assert "red 3: domen se ponavlja" in caplog.text
+
+
+def test_greska_u_listi_je_poruka_a_ne_traceback(tmp_path):
     path = tmp_path / "d.csv"
     path.write_text("sajt,industry\na.rs,hotel\n", encoding="utf-8")
-    with pytest.raises(SystemExit, match="domain"):
-        cli.read_domains(path)
+    with pytest.raises(SystemExit, match="red 1: nedostaje kolona `domain`"):
+        cli.main(["scan", str(path), "--out", str(tmp_path / "izlaz")])
 
 
 # --------------------------------------------------------------------------- #
@@ -270,56 +267,8 @@ def test_verzija_je_ista_u_paketu_cli_i_user_agentu(capsys, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# Pogađanje grešaka: lista iz Excel-a na srpskom Windows-u. Kupac nije programer.
+# Pogađanje grešaka: nevažeći brojevi na komandnoj liniji
 # --------------------------------------------------------------------------- #
-def test_csv_iz_excela_sa_tackom_zarezom(tmp_path):
-    """Srpska podešavanja Windows-a: Excel „CSV" razdvaja kolone sa `;`."""
-    path = tmp_path / "d.csv"
-    path.write_text("domain;industry;note\nmensa.rs;institucija;beleška\n", encoding="utf-8")
-    rows = cli.read_domains(path)
-    assert [(r.domain, r.industry, r.note) for r in rows] == [("mensa.rs", "institucija", "beleška")]
-
-
-def test_csv_u_windows_1250(tmp_path):
-    """Excel bez „UTF-8" opcije čuva u windows-1250; ranije je ovo bio traceback."""
-    path = tmp_path / "d.csv"
-    path.write_bytes("domain,industry,note\nmensa.rs,institucija,čćžšđ\n".encode("cp1250"))
-    rows = cli.read_domains(path)
-    assert rows[0].note == "čćžšđ"
-
-
-def test_csv_duplikati_se_skeniraju_jednom(tmp_path):
-    """Isti domen dva puta = dva puta tuđ sajt i dva reda u izveštaju sa istim snapshotom."""
-    path = tmp_path / "d.csv"
-    path.write_text(
-        "domain,industry\nmensa.rs,institucija\nMENSA.RS,hotel\nangolo.rs,restoran\n", encoding="utf-8"
-    )
-    rows = cli.read_domains(path)
-    assert [r.domain for r in rows] == ["mensa.rs", "angolo.rs"]
-    assert rows[0].industry == "institucija", "važi prvo pojavljivanje"
-
-
-def test_csv_sa_bom_oznakom(tmp_path):
-    path = tmp_path / "d.csv"
-    path.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8-sig")
-    assert [r.domain for r in cli.read_domains(path)] == ["mensa.rs"]
-
-
-@pytest.mark.parametrize(
-    "sadrzaj",
-    [
-        pytest.param(b"", id="nv-prazan-fajl"),
-        pytest.param(b"domain,industry\n", id="nv-samo-zaglavlje"),
-        pytest.param(b"domain,industry\n\n  \n", id="nv-prazni-redovi"),
-    ],
-)
-def test_csv_bez_domena_puca_razumljivo(tmp_path, sadrzaj):
-    path = tmp_path / "d.csv"
-    path.write_bytes(sadrzaj)
-    with pytest.raises(SystemExit):
-        cli.read_domains(path)
-
-
 @pytest.mark.parametrize(
     "argumenti",
     [

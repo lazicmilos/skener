@@ -117,7 +117,8 @@ domen da čudan rezultat, tačan ulaz koji ga je proizveo stoji sačuvan na disk
 
 | Modul | Odgovornost | Mreža | Disk |
 |---|---|---|---|
-| `cli` | argumenti, ulazni CSV, log, izveštaji | ne | čita |
+| `cli` | argumenti, log, izveštaji | ne | čita |
+| `inputs` | lista domena i drugi CSV-ovi iz Excel-a; greške i upozorenja sa brojem reda | ne | ne |
 | `pipeline` | redosled faza: nivo 1 → eskalacija → nivo 2 → bodovanje → rangiranje | kroz `fetch.*` | kroz `store` |
 | `config` | pragovi iz TOML-a, identitet operatera | ne | čita |
 | `models` | šeme podataka, serijalizacija | ne | ne |

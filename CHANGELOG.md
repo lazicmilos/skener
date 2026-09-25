@@ -17,6 +17,8 @@ Još nijedna. Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađ
 - Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija
   ([ADR-008](docs/adr/ADR-008-pipeline.md)).
 - Log tokom prolaza ima brojač napretka („nivo 1: 43/200 gotovo").
+- Greška i upozorenje u listi domena navode red u kom su, onako kako ga prikazuje Excel
+  („red 3: domen se ponavlja u listi").
 
 ### Ispravljeno
 

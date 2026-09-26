@@ -111,7 +111,7 @@ SAOBRACAJ_OKO_LOAD = b"""<!doctype html><html><body><h1>Strana</h1>
 <script>
 fetch('/sporo.bin');
 window.addEventListener('load', () => setTimeout(() => fetch('/posle.bin'), 100));
-</script></body></html>"""
+</script><img src="/drzi.png"></body></html>"""
 
 
 @pytest.fixture(scope="module")
@@ -119,8 +119,11 @@ def oko_load():
     """Z-24: zahtev pre `load` čije telo stiže posle njega, i zahtev koji počne tek posle `load`."""
     extra = {
         "/": Response(SAOBRACAJ_OKO_LOAD),
-        # 2 s, a ne manje: pod opterećenjem i prazna stranica ume da stigne do `load` tek posle 0,8 s.
-        "/sporo.bin": Response(b"s" * 150_000, delay=2.0),
+        # `load` čeka sliku. Bez nje stiže odmah posle skripte, a Playwright uz `route` javlja
+        # `request` tek kad zahtev stigne do mreže, pa je pod opterećenjem fetch viđen posle `load`.
+        "/drzi.png": Response(png(1, 1), headers={"content-type": "image/png"}, delay=0.5),
+        # Zaglavlja odmah, telo posle 3 s: odgovor je viđen pre `drain`, a telo stiže posle `load`.
+        "/sporo.bin": Response(b"s" * 150_000, stall=3.0),
         "/posle.bin": Response(b"p" * 200_000),
     }
     with FakeSite(extra=extra) as site:
@@ -135,7 +138,7 @@ def test_zahtev_posle_load_ne_ulazi_u_tezinu(oko_load):
 
 
 def test_telo_koje_stigne_posle_load_za_zahtev_pre_load_se_broji(oko_load):
-    assert oko_load.timing.load_ms < 2000, "telo sporo.bin mora da stigne posle `load`"
+    assert oko_load.timing.load_ms < 3000, "telo sporo.bin mora da stigne posle `load`"
     assert oko_load.network.bytes_at_load >= 150_000
 
 

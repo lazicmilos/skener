@@ -3,6 +3,19 @@
 Dnevnik odluka iz provera na pravim sajtovima. Oblik: **zapažanje — uzrok — odluka**.
 Kako se provera radi, piše u [`provera-na-pravim-sajtovima.md`](provera-na-pravim-sajtovima.md).
 
+## 2026-09-26 — `seo.canonical.duplicate` broji samo tuđi canonical (Z-23)
+
+- **Zapažanje:** u IT-SKENER-002 (O-9) dve podstranice od sedam, koje upućuju na početnu, dale su
+  `critical` i prvo mesto u rangiranju. Treća stranica u pravilu „≥ 3" bila je sama početna, a ona
+  sa canonical-om na sebe je ispravna.
+- **Uzrok:** pravilo je brojalo svaku stranicu sa istim canonical-om, i onu koja upućuje na sebe, a
+  ozbiljnost je uvek bila `critical`, bez obzira na to koliki deo sajta je pogođen.
+- **Odluka:** broje se samo stranice čiji canonical upućuje na drugu adresu
+  (`canonical_foreign_min = 2`, iz bar dve grupe putanja, da paginacija jednog bloga ne bude
+  nalaz). Ozbiljnost po udelu u uzorku: `canonical_share = { high = 0.4, critical = 0.6 }`, ispod
+  toga `medium`. To su početne vrednosti iz specifikacije; granice se biraju u Z-50, posle
+  `recheck`-a nad snapshotima liste A i provere svakog nalaza `curl`-om.
+
 ## 2026-09-24 — treći prolaz: težina iz prenetih bajtova
 
 Ceo izveštaj: [`izvestaj-testiranja-2.md`](izvestaj-testiranja-2.md).

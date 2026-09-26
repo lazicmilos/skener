@@ -118,12 +118,12 @@ FINDINGS: dict[str, dict] = {
     },
     "seo.canonical.duplicate": {
         "client": (
-            "Several checked pages of the site ({stranica}) report the same address to Google as "
-            "their official one ({canonical}). Google may therefore treat them as copies of a single "
-            "page and leave them out of search results."
+            "{stranica} of the {ukupno:n:checked page|checked pages} on the site report a different "
+            "address to Google as their official one ({canonical}). Google may therefore treat them as "
+            "copies of that address and leave them out of search results."
         ),
         "tech": (
-            "canonical_normalized == {canonical} on {stranica} pages "
+            "canonical_normalized == {canonical} on {stranica} of {ukupno} pages (share {udeo}) "
             "from {grupa_putanja} path groups (sample: {uzorak})"
         ),
     },

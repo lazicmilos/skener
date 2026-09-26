@@ -68,6 +68,9 @@ executable_path = ""            # prazno = Playwright-ov Chromium; postavi za si
 
 [thresholds.seo]
 duplicate_min_pages = 3         # ≥ 3 stranice iz različitih grupa putanja (§5)
+canonical_foreign_min = 2       # stranice sa tuđim canonical-om ka istoj adresi, iz toliko grupa putanja
+canonical_share = { high = 0.4, critical = 0.6 }   # udeo tih stranica u uzorku; ispod je medium.
+                                # Početne vrednosti (Z-23); konačne posle kalibracije na listi A (Z-50)
 h1_multiple = 3
 
 [thresholds.perf]

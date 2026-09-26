@@ -122,8 +122,8 @@
   "slucaj": "ispitni/spec/mensa.rs",
   "check_id": "seo.canonical.duplicate",
   "severity": "critical",
-  "client": "Više proverenih stranica sajta (7) prijavljuje Google-u istu adresu kao zvaničnu (https://mensa.rs/). Google ih zato može smatrati kopijama jedne stranice i izostaviti iz pretrage.",
-  "tech": "canonical_normalized == https://mensa.rs/ na 7 stranica iz 7 grupa putanja (uzorak: sitemap)"
+  "client": "6 od 7 proverenih stranica sajta prijavljuje Google-u drugu adresu kao zvaničnu (https://mensa.rs/). Google ih zato može smatrati kopijama te adrese i izostaviti iz pretrage.",
+  "tech": "canonical_normalized == https://mensa.rs/ na 6 od 7 stranica (udeo 0.8571) iz 6 grupa putanja (uzorak: sitemap)"
  },
  {
   "slucaj": "ispitni/spec/mensa.rs",
@@ -283,8 +283,8 @@
   "slucaj": "ispitni/toml/mensa.rs",
   "check_id": "seo.canonical.duplicate",
   "severity": "critical",
-  "client": "Više proverenih stranica sajta (7) prijavljuje Google-u istu adresu kao zvaničnu (https://mensa.rs/). Google ih zato može smatrati kopijama jedne stranice i izostaviti iz pretrage.",
-  "tech": "canonical_normalized == https://mensa.rs/ na 7 stranica iz 7 grupa putanja (uzorak: sitemap)"
+  "client": "6 od 7 proverenih stranica sajta prijavljuje Google-u drugu adresu kao zvaničnu (https://mensa.rs/). Google ih zato može smatrati kopijama te adrese i izostaviti iz pretrage.",
+  "tech": "canonical_normalized == https://mensa.rs/ na 6 od 7 stranica (udeo 0.8571) iz 6 grupa putanja (uzorak: sitemap)"
  },
  {
   "slucaj": "ispitni/toml/mensa.rs",
@@ -416,8 +416,8 @@
   "slucaj": "nivo1/seo.canonical.duplicate",
   "check_id": "seo.canonical.duplicate",
   "severity": "critical",
-  "client": "Više proverenih stranica sajta (5) prijavljuje Google-u istu adresu kao zvaničnu (https://cist.rs/). Google ih zato može smatrati kopijama jedne stranice i izostaviti iz pretrage.",
-  "tech": "canonical_normalized == https://cist.rs/ na 5 stranica iz 5 grupa putanja (uzorak: sitemap)"
+  "client": "4 od 5 proverenih stranica sajta prijavljuje Google-u drugu adresu kao zvaničnu (https://cist.rs/). Google ih zato može smatrati kopijama te adrese i izostaviti iz pretrage.",
+  "tech": "canonical_normalized == https://cist.rs/ na 4 od 5 stranica (udeo 0.8) iz 4 grupa putanja (uzorak: sitemap)"
  },
  {
   "slucaj": "nivo1/seo.canonical.missing",

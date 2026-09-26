@@ -99,28 +99,44 @@ def canonical_missing(snapshot: SiteSnapshot, ctx: Context):
     category="seo",
     base_severity="critical",
     requires=["home"],
-    description="Više stranica iz različitih delova sajta prijavljuje isti canonical.",
-    threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim canonical-om",
+    description=(
+        "Više stranica iz različitih delova sajta upućuje canonical-om na istu drugu adresu. "
+        "Stranica koja upućuje na sebe se ne broji."
+    ),
+    threshold=(
+        "≥ 2 stranice sa tuđim canonical-om ka istoj adresi, iz ≥ 2 grupe putanja; udeo u uzorku "
+        "≥ 0,4 high · ≥ 0,6 critical · inače medium"
+    ),
 )
 def canonical_duplicate(snapshot: SiteSnapshot, ctx: Context):
     if malo := _premalo_stranica(snapshot, ctx, canonical_duplicate.spec):
         return malo
-    min_pages = ctx.th("thresholds.seo.duplicate_min_pages")
-    hit = _duplicates(snapshot, lambda p: p.canonical_normalized, min_pages)
+
+    def tudji(page: PageSnapshot) -> str | None:
+        # Tuđi canonical: postoji i upućuje na drugu adresu od one na kojoj je stranica (Z-23).
+        target = page.canonical_normalized
+        return target if target and target != normalize(page.final_url or page.url) else None
+
+    hit = _duplicates(snapshot, tudji, ctx.th("thresholds.seo.canonical_foreign_min"))
     if not hit:
         return ok(canonical_duplicate.spec)
     value, pages, groups = hit
+    ukupno = sum(1 for p in snapshot.pages if p.status == 200)
+    udeo = len(pages) / ukupno
+    pragovi = ctx.th("thresholds.seo.canonical_share")
     return finding(
         canonical_duplicate.spec,
         ctx,
         evidence={
             "canonical": value,
             "stranica": len(pages),
-            "n": len(pages) - 1,
+            "ukupno": ukupno,
+            "udeo": round(udeo, 4),
             "grupa_putanja": len(groups),
             "uzorak": snapshot.sample_source,  # uzorak iz linkova je manje pouzdan (§4.4)
         },
         urls=[p.final_url or p.url for p in pages],
+        severity=next((s for s in ("critical", "high") if udeo >= pragovi[s]), "medium"),
     )
 
 

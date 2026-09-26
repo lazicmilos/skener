@@ -133,12 +133,12 @@ FINDINGS: dict[str, dict] = {
     },
     "seo.canonical.duplicate": {
         "client": (
-            "Više proverenih stranica sajta ({stranica}) prijavljuje Google-u istu adresu kao "
-            "zvaničnu ({canonical}). Google ih zato može smatrati kopijama jedne stranice i "
-            "izostaviti iz pretrage."
+            "{stranica} od {ukupno:n:proverene stranice|proverene stranice|proverenih stranica} sajta "
+            "prijavljuje Google-u drugu adresu kao zvaničnu ({canonical}). Google ih zato može smatrati "
+            "kopijama te adrese i izostaviti iz pretrage."
         ),
         "tech": (
-            "canonical_normalized == {canonical} na {stranica} stranica "
+            "canonical_normalized == {canonical} na {stranica} od {ukupno} stranica (udeo {udeo}) "
             "iz {grupa_putanja} grupa putanja (uzorak: {uzorak})"
         ),
     },

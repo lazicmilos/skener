@@ -64,6 +64,11 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Ispravljeno
 
+- `seo.canonical.duplicate` je brojao i stranicu koja upućuje na sebe, pa su dve podstranice od
+  sedam, sa canonical-om na početnu, davale `critical`. Sada se broje samo stranice sa tuđim
+  canonical-om (bar dve, iz dve grupe putanja), a ozbiljnost zavisi od njihovog udela u uzorku:
+  `medium`, `high` od 0,4, `critical` od 0,6. Rečenica kaže koliko od koliko proverenih stranica.
+
 - Sajt sa jednom ili dve stranice bio je `partial`, jer provere duplikata nisu imale šta da
   uporede. Sada su `not_applicable`, ali samo kad sajt stvarno nema više stranica. Kad je uzorak
   mali zbog budžeta ili veza iz JavaScript-a, ostaju `unknown`, sa razlogom.

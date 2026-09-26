@@ -189,7 +189,7 @@ generiše ponovo; CI proverava samo da u njoj nije izostala nijedna provera iz r
 | `perf.compression.missing` | 1 | perf | low | content-encoding ∉ {gzip, br, zstd, deflate} i HTML > 50 kB |
 | `perf.html.size` | 1 | perf | low | html_bytes > thresholds.perf.html_size_kb (500 kB) |
 | `perf.redirect.chain` | 1 | perf | low | broj skokova ≥ thresholds.perf.redirect_hops (3) |
-| `seo.canonical.duplicate` | 1 | seo | critical | ≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim canonical-om |
+| `seo.canonical.duplicate` | 1 | seo | critical | ≥ 2 stranice sa tuđim canonical-om ka istoj adresi, iz ≥ 2 grupe putanja; udeo u uzorku ≥ 0,4 high · ≥ 0,6 critical · inače medium |
 | `seo.canonical.missing` | 1 | seo | high | nema oznake na početnoj |
 | `seo.description.duplicate` | 1 | seo | medium | ≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim opisom |
 | `seo.description.missing` | 1 | seo | medium | prazan ili nepostojeći meta opis |

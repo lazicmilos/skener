@@ -39,6 +39,9 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Dodato
 
+- Uzrok `partial`-a: izveštaj domena ima `partial_causes` (`budget`, `unknown`), zbir ih broji
+  posebno, a JSON i HTML daju udeo budžeta među domenima koji rade i udeo `unknown`-a po proveri
+  (`budget_share`, `unknown_share`).
 - JSON izveštaj `report.json` sa verzijom šeme (`skener/schema/report-2.json`), otiskom
   konfiguracije i okruženjem. `--format` ga podrazumevano piše uz HTML i CSV.
 - Snapshot nivoa 2 beleži verziju Chromium-a kojim je meren.

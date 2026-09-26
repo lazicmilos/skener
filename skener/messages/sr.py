@@ -323,6 +323,11 @@ TEXT: dict[str, str] = {
     ),
     "excluded_count": "Izuzeto na zahtev administratora: {count}",
     "col_reason": "Razlog",
+    "col_check": "Provera",
+    "col_share": "Udeo",
+    "percent": "{udeo} %",
+    "share_budget": "Potrošen budžet: {udeo} % domena koji rade",
+    "share_unknown": "Nije moglo da se proveri, po proveri (udeo domena koji rade)",
     "assumption_html": (
         "<b>Pretpostavka za procenu vremena učitavanja:</b> efektivna brzina\n"
         "{speed} Mb/s ({mb_per_s} MB/s, spora 4G veza) uz {overhead} s režijskog\n"

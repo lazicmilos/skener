@@ -21,6 +21,9 @@ from skener.models import (
     Unknown,
 )
 
+# Sajtovi koji rade: samo oni se rangiraju i samo oni ulaze u imenilac udela iz §7.
+RADE = ("scanned", "partial")
+
 
 def weigh(finding: Finding, industry: str, config: dict) -> float:
     """`weight = base_points × industry_multiplier[industry][category]` (§9.2).
@@ -60,6 +63,7 @@ def build_report(
         industry=site.industry,
         final_url=site.entry.final_url if site.entry else None,
         status=status,
+        partial_causes=_partial_causes(site, unknowns) if status == "partial" else [],
         reason=_failure(site) if status == "failed" else None,
         level2_ran=browser is not None,
         escalation_reasons=list(escalation_reasons),
@@ -83,6 +87,30 @@ def _status(site: SiteSnapshot, findings: Sequence[Finding], unknowns: Sequence[
     return "scanned"
 
 
+def _partial_causes(site: SiteSnapshot, unknowns: Sequence[Unknown]) -> list[str]:
+    return [cause for cause, yes in (("budget", site.budget.exhausted), ("unknown", unknowns)) if yes]
+
+
+def partial_shares(reports: Sequence[DomainReport]) -> tuple[float, dict[str, float]]:
+    """Udeo budžeta među domenima koji rade, i udeo `unknown`-a po proveri (Z-22, §7).
+
+    Imenilac za proveru su domeni koji rade i na kojima je pokrenuta: nivo 2 samo gde je radio.
+    `failed`, `unreachable` i izuzeti ne ulaze, jer tamo nijedna provera nije ni imala šta da vidi.
+    """
+    from skener.checks import registry
+
+    registry.load_all()
+    rade = [r for r in reports if r.status in RADE]
+    budzet = sum("budget" in r.partial_causes for r in rade)
+    po_proveri = {}
+    for spec in sorted(registry.REGISTRY.values(), key=lambda s: s.check_id):
+        pokrenuta = [r for r in rade if spec.level == 1 or r.level2_ran]
+        if pokrenuta:
+            nepoznato = sum(any(u.check_id == spec.check_id for u in r.unknowns) for r in pokrenuta)
+            po_proveri[spec.check_id] = round(nepoznato / len(pokrenuta), 4)
+    return (round(budzet / len(rade), 4) if rade else 0.0), po_proveri
+
+
 def _failure(site: SiteSnapshot) -> Reason:
     """Zašto početna nije stigla, za listu „Nije skenirano"."""
     entry = site.entry
@@ -101,7 +129,7 @@ def rank(reports: Iterable[DomainReport]) -> list[DomainReport]:
     problem koji postoji. Rangiraju se samo sajtovi koji rade (Z-20): onaj koji se ne
     otvara ide u „Ne rade", a onaj koji alat nije pregledao u „Nije skenirano".
     """
-    rade = (r for r in reports if r.status in ("scanned", "partial"))
+    rade = (r for r in reports if r.status in RADE)
     ordered = sorted(rade, key=lambda r: (-r.max_finding_weight, -r.total_score, r.domain))
     for position, report in enumerate(ordered, start=1):
         report.rank = position

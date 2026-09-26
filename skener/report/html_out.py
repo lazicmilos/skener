@@ -20,6 +20,7 @@ from skener.messages import reason as razlog
 from skener.messages import render as poruka
 from skener.messages import text
 from skener.models import DomainReport
+from skener.score import RADE, partial_shares
 
 # Znak i boje po ozbiljnosti; oznaka („KRITIČNO") dolazi iz kataloga jezika.
 OZBILJNOST = {
@@ -138,7 +139,7 @@ def render(
         return [r for r in reports if r.status == status]
 
     # Rangiranje je samo za sajtove koji rade; ostali imaju svoje odeljke (Z-20).
-    ranked = [r for r in reports if r.status in ("scanned", "partial")]
+    ranked = [r for r in reports if r.status in RADE]
     level2 = sum(1 for r in reports if r.level2_ran)
     generated = reports[0].scanned_at if reports else ""
 
@@ -182,7 +183,7 @@ def render(
 <div class="cards">
 {"".join(f'<div class="card"><b>{_e(v)}</b><span>{k}</span></div>' for k, v in cards)}
 </div>
-
+{_shares(reports, lang)}
 <h2>{t("ranked")}</h2>
 <p class="sub">{t("ranked_note")}</p>
 <table>
@@ -218,6 +219,25 @@ def _row(report: DomainReport, lang: str) -> str:
         f"<td>{_e(text('yes' if report.level2_ran else 'no', lang))}</td>"
         f"<td>{_e(report.status)}</td></tr>"
     )
+
+
+def _shares(reports: Sequence[DomainReport], lang: str) -> str:
+    """Oba uzroka `partial`-a posebno, kao izlazni kriterijumi iz §7 (Z-22)."""
+    budzet, po_proveri = partial_shares(reports)
+    rows = "".join(
+        f'<tr><td>{_e(check_id)}</td><td class="num">{_e(text("percent", lang, udeo=udeo * 100))}</td></tr>'
+        for check_id, udeo in sorted(po_proveri.items(), key=lambda kv: (-kv[1], kv[0]))
+        if udeo
+    )
+    table = (
+        f'<details class="unknowns"><summary>{_e(text("share_unknown", lang))}</summary>'
+        f"<table><thead><tr><th>{_e(text('col_check', lang))}</th>"
+        f'<th class="num">{_e(text("col_share", lang))}</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table></details>"
+        if rows
+        else ""
+    )
+    return f'<p class="sub">{_e(text("share_budget", lang, udeo=budzet * 100))}</p>\n{table}\n'
 
 
 def _unreachable(reports: Sequence[DomainReport], lang: str) -> str:

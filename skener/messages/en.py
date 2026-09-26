@@ -309,6 +309,11 @@ TEXT: dict[str, str] = {
     ),
     "excluded_count": "Excluded at the administrator's request: {count}",
     "col_reason": "Reason",
+    "col_check": "Check",
+    "col_share": "Share",
+    "percent": "{udeo} %",
+    "share_budget": "Budget spent: {udeo} % of working domains",
+    "share_unknown": "Could not be checked, per check (share of working domains)",
     "assumption_html": (
         "<b>Assumption for the loading time estimate:</b> effective speed\n"
         "{speed} Mb/s ({mb_per_s} MB/s, a slow 4G connection) plus {overhead} s of overhead\n"

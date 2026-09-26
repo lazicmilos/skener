@@ -45,9 +45,10 @@ def test_recheck_bez_snapshota_je_greska_ulaza(tmp_path):
 
 def test_rezultat_nosi_zbir_po_statusu_i_vreme():
     rezultat = pipeline.recheck(FIXTURES, load_config())
-    assert set(rezultat.summary) == {"scanned", "partial", "failed", "unreachable", "excluded"}
+    statusi = ("scanned", "partial", "failed", "unreachable", "excluded")
+    assert set(rezultat.summary) == {*statusi, "partial_budget", "partial_unknown"}
     svi = rezultat.ranked + rezultat.unreachable + rezultat.not_scanned
-    assert sum(rezultat.summary.values()) == len(svi), "recheck nema izuzetih"
+    assert sum(rezultat.summary[s] for s in statusi) == len(svi), "recheck nema izuzetih"
     assert rezultat.started_at.endswith("Z") and rezultat.finished_at >= rezultat.started_at
     assert rezultat.duration_s["total"] >= 0
 

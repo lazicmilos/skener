@@ -34,7 +34,7 @@ from skener.models import (
     ScanResult,
     SiteSnapshot,
 )
-from skener.score import analyze, escalation_reasons, rank, select_for_level2
+from skener.score import analyze, escalation_reasons, partial_shares, rank, select_for_level2
 
 log = logging.getLogger("skener")
 
@@ -203,6 +203,10 @@ def _result(
 ) -> ScanResult:
     counts = Counter(report.status for report in reports)
     counts["excluded"] = excluded
+    summary = {status: counts[status] for status in typing.get_args(DomainStatus)}
+    for cause in ("budget", "unknown"):
+        summary[f"partial_{cause}"] = sum(cause in r.partial_causes for r in reports)
+    budget_share, unknown_share = partial_shares(reports)
     po_imenu = sorted(reports, key=lambda r: r.domain)
     return ScanResult(
         started_at=started_at,
@@ -210,7 +214,9 @@ def _result(
         duration_s={name: round(seconds, 2) for name, seconds in durations.items()},
         config_digest=digest(config),
         environment=_environment(browsers),
-        summary={status: counts[status] for status in typing.get_args(DomainStatus)},
+        summary=summary,
+        budget_share=budget_share,
+        unknown_share=unknown_share,
         ranked=rank(reports),
         unreachable=[r for r in po_imenu if r.status == "unreachable"],
         not_scanned=[r for r in po_imenu if r.status == "failed"],

@@ -358,6 +358,8 @@ class DomainReport:
     industry: str = "ostalo"
     final_url: str | None = None
     status: DomainStatus = "scanned"
+    # Zašto je `partial`: `budget`, `unknown` ili oba (Z-22). Prazno za ostale statuse.
+    partial_causes: list[Literal["budget", "unknown"]] = field(default_factory=list)
     level2_ran: bool = False
     escalation_reasons: list[Reason] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
@@ -414,6 +416,10 @@ class ScanResult:
     config_digest: str = ""
     environment: dict[str, str | None] = field(default_factory=dict)
     summary: dict[str, int] = field(default_factory=dict)
+    # Izlazni kriterijumi (§7, Z-22): udeo domena koji rade sa potrošenim budžetom, i za svaku
+    # proveru udeo `unknown`-a među domenima koji rade i na kojima je pokrenuta.
+    budget_share: float = 0.0
+    unknown_share: dict[str, float] = field(default_factory=dict)
     ranked: list[DomainReport] = field(default_factory=list)
     unreachable: list[DomainReport] = field(default_factory=list)
     not_scanned: list[DomainReport] = field(default_factory=list)  # `failed`; izuzeti su samo broj

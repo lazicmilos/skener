@@ -98,6 +98,12 @@ otisak konfiguracije (`config_digest`: sha256 pragova, množilaca i bodova, bez 
 paralelizma), okruženje (OS, Python, Chromium) i zbir po statusu. Domeni su u tri liste:
 `ranked`, `unreachable` („Ne rade") i `not_scanned` (`failed`, sa razlogom u `reason`).
 
+Domen je `partial` iz dva razloga, a `partial_causes` kaže iz kog: potrošen budžet (`budget`) ili
+provera koja nije mogla da se izvrši (`unknown`). Zbir ih broji posebno, a `budget_share` i
+`unknown_share` daju udeo budžeta među domenima koji rade i udeo `unknown`-a za svaku proveru.
+Imenilac su domeni koji rade i na kojima je provera pokrenuta, pa za proveru nivoa 2 samo oni koji
+su prošli nivo 2. Oba udela su izlazni kriterijumi v2, a HTML izveštaj ih prikazuje ispod zbira.
+
 Nalaz u JSON-u nema rečenicu, nego `check_id`, dokaz i `variant`. Rečenica se pravi iz dokaza,
 na jeziku onoga ko čita.
 

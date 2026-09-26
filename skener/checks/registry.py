@@ -28,7 +28,6 @@ class Context:
     domain: str
     industry: str
     config: dict[str, Any]
-    host_canonicalization: bool = False
     browser: BrowserSnapshot | None = None
 
     def th(self, dotted: str) -> Any:
@@ -45,7 +44,6 @@ class CheckSpec:
     description: str
     threshold: str
     fn: CheckFn
-    optional: bool = False
 
 
 REGISTRY: dict[str, CheckSpec] = {}
@@ -60,7 +58,6 @@ def check(
     description: str,
     threshold: str,
     requires: Iterable[str] = (),
-    optional: bool = False,
 ) -> Callable[[CheckFn], CheckFn]:
     def register(fn: CheckFn) -> CheckFn:
         if check_id in REGISTRY:
@@ -74,7 +71,6 @@ def check(
             description=description,
             threshold=threshold,
             fn=fn,
-            optional=optional,
         )
         REGISTRY[check_id] = spec
         # Telo provere dohvata svoj spec preko `fn.spec` — bez traženja po registru.
@@ -183,18 +179,12 @@ def unmet(spec: CheckSpec, snapshot: Any) -> Reason | None:
 # --------------------------------------------------------------------------- #
 # Motor
 # --------------------------------------------------------------------------- #
-def specs_for(level: int, ctx: Context) -> list[CheckSpec]:
-    return [
-        spec
-        for spec in sorted(REGISTRY.values(), key=lambda s: s.check_id)
-        if spec.level == level and (not spec.optional or ctx.host_canonicalization)
-    ]
-
-
 def run(level: int, snapshot: Any, ctx: Context) -> list[CheckResult]:
     """Svaka provera u sopstvenom `try`: izuzetak nikad ne napušta domen (§8.2)."""
     results: list[CheckResult] = []
-    for spec in specs_for(level, ctx):
+    for spec in sorted(REGISTRY.values(), key=lambda s: s.check_id):
+        if spec.level != level:
+            continue
         reason = unmet(spec, snapshot)
         if reason:
             results.append(CheckResult(check_id=spec.check_id, status="unknown", reason=reason))

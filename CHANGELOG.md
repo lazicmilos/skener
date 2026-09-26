@@ -36,6 +36,8 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   `not_applicable` u istom obliku kao `unknowns`, ali ona ne čini domen `partial`.
 - Vrsta greške `dns` u snapshotu je podeljena na `dns_nxdomain`, `dns_nodata` (ime postoji, ali
   nema adresu), `dns_temporary` i `dns` (ostale DNS greške). TCP veza koja nije uspostavljena je `no_connection`.
+- `CheckSpec` više nema `optional`, `check()` ga ne prima, a `Context` nema `host_canonicalization`.
+  Nijedna provera ih nije koristila; kanonizacija hosta je sada obična provera.
 
 ### Dodato
 

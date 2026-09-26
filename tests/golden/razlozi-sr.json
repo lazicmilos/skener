@@ -57,7 +57,7 @@
  {
   "slucaj": "nivo1/prazan-snapshot",
   "provera": "seo.canonical.duplicate",
-  "razlog": "uzorak ima manje od 3 uspešno dohvaćene stranice"
+  "razlog": "početna strana nije uspešno dohvaćena"
  },
  {
   "slucaj": "nivo1/prazan-snapshot",
@@ -67,7 +67,7 @@
  {
   "slucaj": "nivo1/prazan-snapshot",
   "provera": "seo.description.duplicate",
-  "razlog": "uzorak ima manje od 3 uspešno dohvaćene stranice"
+  "razlog": "početna strana nije uspešno dohvaćena"
  },
  {
   "slucaj": "nivo1/prazan-snapshot",
@@ -77,7 +77,7 @@
  {
   "slucaj": "nivo1/prazan-snapshot",
   "provera": "seo.title.duplicate",
-  "razlog": "uzorak ima manje od 3 uspešno dohvaćene stranice"
+  "razlog": "početna strana nije uspešno dohvaćena"
  },
  {
   "slucaj": "nivo1/prazan-snapshot",

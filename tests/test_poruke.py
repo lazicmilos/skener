@@ -61,7 +61,7 @@ def test_svaki_kod_razloga_iz_koda_postoji_u_katalogu():
 
     paket = Path(registry.__file__).parents[1]
     izvor = "".join(p.read_text(encoding="utf-8") for p in paket.rglob("*.py"))
-    kodovi = set(re.findall(r'unknown\(\s*[\w.]+,\s*"([\w.]+)"', izvor))
+    kodovi = set(re.findall(r'(?:unknown|not_applicable)\(\s*[\w.]+,\s*"([\w.]+)"', izvor))
     kodovi |= set(re.findall(r'Reason\("([\w.]+)"', izvor))
     assert len(kodovi) > 20, kodovi
     assert kodovi <= set(catalog("sr").REASONS), sorted(kodovi - set(catalog("sr").REASONS))

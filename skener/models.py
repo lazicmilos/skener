@@ -17,7 +17,8 @@ from skener import __version__
 
 Severity = Literal["critical", "high", "medium", "low"]
 Category = Literal["seo", "social", "i18n", "infra", "perf", "a11y", "qa"]
-CheckStatus = Literal["ok", "finding", "unknown"]
+# `not_applicable`: provera nema šta da proveri na ovom sajtu (Z-21); razlog je obavezan.
+CheckStatus = Literal["ok", "finding", "unknown", "not_applicable"]
 Industry = Literal[
     "hotel", "restoran", "zdravstvo", "ecommerce", "b2b", "institucija", "ostalo"
 ]
@@ -212,6 +213,8 @@ class SiteSnapshot:
     # Kad je ulaz pokušan, u UTC-u. Drugi pokušaj postoji samo kad je prvi izgledao kao da sajt
     # ne radi (Z-20); snapshot je tada iz drugog.
     entry_attempts: list[str] = field(default_factory=list)
+    # Interne veze iz sirovog HTML-a početne (do 200); provera duplikata broji adrese sajta (Z-21).
+    home_links: list[str] = field(default_factory=list)
 
     @property
     def home(self) -> PageSnapshot | None:
@@ -270,6 +273,9 @@ class DomStats:
     images_empty_alt: int = 0
     oversized_images: list[OversizedImage] = field(default_factory=list)
     images_unmeasured: int = 0
+    # Interne veze iz renderovanog DOM-a (do 200) i koliko ih ima; `None` = nisu beležene (1.x).
+    internal_links: list[str] = field(default_factory=list)
+    internal_links_total: int | None = None
 
 
 @dataclass
@@ -332,8 +338,8 @@ class CheckResult:
     findings: list[Finding] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if self.status == "unknown" and not self.reason:
-            raise ValueError(f"{self.check_id}: `unknown` bez `reason` je bug (§3.4)")
+        if self.status in ("unknown", "not_applicable") and not self.reason:
+            raise ValueError(f"{self.check_id}: `{self.status}` bez `reason` je bug (§3.4)")
         if self.status != "finding" and self.findings:
             raise ValueError(f"{self.check_id}: nalazi postoje a status nije `finding`")
         if self.status == "finding" and not self.findings:
@@ -356,6 +362,8 @@ class DomainReport:
     escalation_reasons: list[Reason] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     unknowns: list[Unknown] = field(default_factory=list)
+    # Isti oblik kao `unknowns`, ali ne pravi `partial`: provera nema šta da proveri (Z-21).
+    not_applicable: list[Unknown] = field(default_factory=list)
     total_score: float = 0.0
     max_finding_weight: float = 0.0
     rank: int = 0  # 0 = nije rangiran (`unreachable`, `failed`)

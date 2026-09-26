@@ -398,16 +398,21 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     candidates = await _collect_sitemap(
         fetcher, origin, budget, snapshot, rules, verify=verify, crawl_delay=crawl_delay
     )
-    if not candidates:
-        candidates = page_builder.internal_links(home.raw_html, base_url)
-        snapshot.sample_source = "links" if candidates else "none"
-    else:
-        snapshot.sample_source = "sitemap"
+    links = page_builder.internal_links(home.raw_html, base_url)
+    snapshot.home_links = links[: page_builder.LINKS_KEPT]
+    snapshot.sample_source = "sitemap" if candidates else "links" if links else "none"
 
     # Alat koji prijavljuje da robots.txt nedostaje, a ignoriše ga kad postoji,
     # je nekonzistentan na način koji se primeti (§4.3).
-    allowed = [url for url in candidates if robots_parser.allows(rules, url)]
-    sample = sitemap_parser.sample(base_url, allowed, get(cfg, "sitemap.sample_size"))
+    def allowed(urls: list[str]) -> list[str]:
+        return [url for url in urls if robots_parser.allows(rules, url)]
+
+    size = get(cfg, "sitemap.sample_size")
+    sample = sitemap_parser.sample(base_url, allowed(candidates), size)
+    if len(sample) < size:
+        # Mapa sajta ne navodi dovoljno adresa: uzorak se dopunjava vezama sa početne (Z-21).
+        dopuna = [url for url in allowed(links) if url not in sample]
+        sample += sitemap_parser.sample(base_url, dopuna, size - len(sample) + 1)[1:]
 
     # Sonde idu pre uzorka: dva zahteva za `high` nalaz. Posle uzorka ih velika mapa
     # sajta (Yoast indeks sa 9 mapa) ostavi bez budžeta.

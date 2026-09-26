@@ -16,6 +16,7 @@ from skener.models import OpenGraph, PageSnapshot
 
 RELEVANT_HEADERS = ("content-encoding", "content-type", "content-length", "cache-control", "vary")
 TEXT_SAMPLE_CHARS = 4000
+LINKS_KEPT = 200  # toliko internih veza ide u snapshot; za poređenje duplikata trebaju tri (Z-21)
 OG_KEYS = {"og:title": "title", "og:description": "description", "og:image": "image", "og:url": "url"}
 
 _CHARSET_HEADER = re.compile(r"charset=([\w-]+)", re.I)
@@ -70,15 +71,16 @@ def build(
 
 
 def internal_links(html: str | None, base_url: str) -> list[str]:
-    """Fallback uzorak kad nema sitemapa (§4.4): interni `<a href>` sa početne."""
+    """Dopuna uzorka kad mapa sajta ne navodi dovoljno adresa (§4.4): interni `<a href>` sa početne."""
     if not html:
         return []
-    seen: dict[str, None] = {}
-    for anchor in LexborHTMLParser(html).css("a"):
-        target = normalize(anchor.attributes.get("href"), base_url)
-        if target and same_site(target, base_url):
-            seen.setdefault(target, None)
-    return list(seen)
+    return internal([anchor.attributes.get("href") for anchor in LexborHTMLParser(html).css("a")], base_url)
+
+
+def internal(hrefs: list[str | None], base_url: str) -> list[str]:
+    """Interne adrese, normalizovane, bez ponavljanja, redom prvog pojavljivanja."""
+    targets = (normalize(href, base_url) for href in hrefs)
+    return list(dict.fromkeys(t for t in targets if t and same_site(t, base_url)))
 
 
 def _decode(body: bytes, content_type: str) -> str:

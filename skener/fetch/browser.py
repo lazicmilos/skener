@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 
 from skener import __version__, addresses, store
 from skener.config import get, user_agent
+from skener.fetch.page import LINKS_KEPT, internal
 from skener.models import (
     BrowserSnapshot,
     ConsoleStats,
@@ -79,6 +80,7 @@ _DOM = """
     h1: document.querySelectorAll('h1').length,
     total: images.length,
     withoutAlt, emptyAlt, unmeasured, oversized,
+    links: Array.from(document.links, (a) => a.href),
   };
 }
 """
@@ -348,6 +350,8 @@ async def _read_dom(
         for item in raw["oversized"]
     ]
     oversized.sort(key=lambda image: -image.est_waste_kb)
+    # Veze koje crta JavaScript vidi samo nivo 2 (Z-21).
+    links = internal(raw["links"], snapshot.url)
     return DomStats(
         h1_count=raw["h1"],
         images_total=raw["total"],
@@ -355,6 +359,8 @@ async def _read_dom(
         images_empty_alt=raw["emptyAlt"],
         oversized_images=oversized,
         images_unmeasured=raw["unmeasured"],
+        internal_links=links[:LINKS_KEPT],
+        internal_links_total=len(links),
     )
 
 

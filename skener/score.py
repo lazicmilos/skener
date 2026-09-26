@@ -65,6 +65,7 @@ def build_report(
         escalation_reasons=list(escalation_reasons),
         findings=findings,
         unknowns=unknowns,
+        not_applicable=[Unknown(r.check_id, r.reason) for r in results if r.status == "not_applicable"],
         total_score=round(sum(f.weight for f in findings), 4),
         max_finding_weight=max((f.weight for f in findings), default=0.0),
         scanned_at=site.fetched_at,
@@ -184,7 +185,8 @@ def analyze(
     from skener.checks import registry
 
     registry.load_all()
-    ctx = registry.Context(domain=site.domain, industry=site.industry, config=config)
+    # Nivo 1 vidi i nivo 2: provera duplikata broji i veze iz renderovanog DOM-a (Z-21).
+    ctx = registry.Context(domain=site.domain, industry=site.industry, config=config, browser=browser)
     results = list(registry.run(1, site, ctx))
     if browser is not None:
         results.extend(registry.run(2, browser, ctx))

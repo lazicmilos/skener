@@ -324,6 +324,7 @@ TEXT: dict[str, str] = {
     "copied": "Copied ✓",
     "no_findings": "No findings — the site is in order on the checked points.",
     "unknowns": "Could not be checked ({count})",
+    "not_applicable": "does not apply: {tekst}",
     "escalated_because": "Sent to level 2 because: ",
     "finding_meta": "· level {level} · {weight} points",
     "draft_clean": "I did not find any significant problems on {domain}.",
@@ -346,7 +347,6 @@ REASONS: dict[str, str] = {
     "requires.entry_response": "the home page returned no response (network error before HTTP)",
     "requires.home": "the home page was not fetched successfully",
     "requires.home_html": "the raw HTML of the home page was not saved",
-    "requires.pages": "the sample has fewer than 3 successfully fetched pages",
     "requires.robots": "the robots.txt request was not made (network error or budget)",
     "requires.sitemap": "the sitemap request was not made (network error or budget)",
     "requires.soft404": "the two soft 404 probes were not both made",
@@ -379,6 +379,21 @@ REASONS: dict[str, str] = {
     "unreachable_unsure": (
         "the home page returned no response ({vrsta}, attempts: {pokusaja}); that does not show that the "
         "site is down"
+    ),
+    # duplicate checks when the sample has fewer pages than the threshold (Z-21)
+    "pages_budget": (
+        "the sample has fewer than {prag:n:page|pages}, because the budget ran out before the end"
+    ),
+    "pages_sample": (
+        "the sample has fewer than {prag:n:page|pages}, but the site has at least "
+        "{adresa:n:internal address|internal addresses}"
+    ),
+    "pages_js": (
+        "the sample has fewer than {prag:n:page|pages}, and links drawn by JavaScript were not seen "
+        "(level 2 did not run, and the raw HTML of the home page is empty or has no h1)"
+    ),
+    "few_pages": (
+        "the site has {adresa:n:internal address|internal addresses}, and a comparison needs at least {prag}"
     ),
     # why a domain was not scanned (the „Not scanned" list)
     "entry_missing": "the snapshot has no home page (fetching crashed, see the log)",

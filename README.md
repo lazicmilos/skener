@@ -206,6 +206,14 @@ trećeg stanja ne razlikuješ „čisto" od „nije provereno", a baš ta razlik
 poverenja u sopstveni izveštaj. Primer: kad sajt na svaki zahtev vrati 403 jer blokira botove, alat
 ne tvrdi da mu fali `robots.txt`. Kaže da ne zna.
 
+Četvrto stanje je `not_applicable`, isto sa obaveznim razlogom: provera nema šta da proveri. Provere
+duplikata ga daju kad sajt stvarno ima manje od tri stranice. Mali uzorak nije dovoljan, jer je
+uzorak mali i kad budžet istekne ili kad veze crta JavaScript. Zato se broje adrese iz mape sajta, iz
+veza sa početne i iz veza koje vidi browser, a bar jedan izvor mora da vidi sadržaj koji crta
+JavaScript. Kad neki od tih uslova ne važi, provera je `unknown`. Za razliku od `unknown`,
+`not_applicable` ne čini domen delimično skeniranim. Kad mapa sajta navodi manje adresa nego što
+uzorak traži, uzorak se dopunjava vezama sa početne.
+
 Rečenice za klijenta tvrde samo ono što je proverljivo, a svaki broj u njima dolazi iz izmerenog
 dokaza. Oba pravila čuvaju testovi u `tests/test_poruke.py`, uz slaganje broja i imenice („4 glavna
 naslova", „5 glavnih naslova", „4 main headings").

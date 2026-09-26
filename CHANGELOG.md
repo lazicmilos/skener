@@ -32,6 +32,8 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   `infra.unreachable` i status `unreachable`, i ide u listu „Ne rade" umesto u rangiranje.
   `rank()` rangira samo `scanned` i `partial`, a ostali domeni imaju `rank` 0. JSON ima liste
   `unreachable` i `not_scanned`, a izveštaj domena polje `reason` (zašto je `failed`).
+- Provera ima i četvrto stanje, `not_applicable`, sa obaveznim razlogom. Izveštaj domena ima listu
+  `not_applicable` u istom obliku kao `unknowns`, ali ona ne čini domen `partial`.
 - Vrsta greške `dns` u snapshotu je podeljena na `dns_nxdomain`, `dns_nodata` (ime postoji, ali
   nema adresu), `dns_temporary` i `dns` (ostale DNS greške). TCP veza koja nije uspostavljena je `no_connection`.
 
@@ -52,10 +54,16 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   pokušaj, sa novim budžetom, najranije `http.second_attempt_after_s` (60 s) posle prvog.
 - HTML izveštaj ima odeljke „Ne rade", sa posebnim nacrtom mejla, i „Nije skenirano", sa
   razlogom i brojem izuzetih domena.
+- Kad mapa sajta navodi manje adresa nego što uzorak traži, uzorak se dopunjava vezama sa početne.
+  Snapshot beleži interne veze sa početne, a nivo 2 i veze iz renderovanog DOM-a.
 - Greška i upozorenje u listi domena navode red u kom su, onako kako ga prikazuje Excel
   („red 3: domen se ponavlja u listi").
 
 ### Ispravljeno
+
+- Sajt sa jednom ili dve stranice bio je `partial`, jer provere duplikata nisu imale šta da
+  uporede. Sada su `not_applicable`, ali samo kad sajt stvarno nema više stranica. Kad je uzorak
+  mali zbog budžeta ili veza iz JavaScript-a, ostaju `unknown`, sa razlogom.
 
 - Kad početna ne stigne do `load` za 25 s, rečenica je tvrdila „treba joj 25 s da se do kraja
   učita", a treba joj više. Sada kaže da se ni za 25 s nije do kraja učitala.

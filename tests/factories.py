@@ -144,8 +144,8 @@ def clean_browser(*, domain: str = "cist.rs", **overrides: Any) -> BrowserSnapsh
     return replace(snapshot, **overrides) if overrides else snapshot
 
 
-def run_level(level: int, snapshot: Any, industry: str = "ostalo") -> dict[str, Any]:
-    ctx = registry.Context(domain=snapshot.domain, industry=industry, config=CONFIG)
+def run_level(level: int, snapshot: Any, industry: str = "ostalo", browser: Any = None) -> dict[str, Any]:
+    ctx = registry.Context(domain=snapshot.domain, industry=industry, config=CONFIG, browser=browser)
     return {result.check_id: result for result in registry.run(level, snapshot, ctx)}
 
 

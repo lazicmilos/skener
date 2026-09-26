@@ -107,6 +107,19 @@ def snimak():
         yield snimi(site)
 
 
+def test_browser_belezi_interne_veze_iz_renderovanog_doma():
+    """Z-21: vezu koju crta JavaScript vidi samo nivo 2; spoljna veza nije interna."""
+    strana = (
+        b"<!doctype html><html><body><a href='/o-nama'>o nama</a><a href='https://drugi.rs/'>x</a>"
+        b"<script>document.body.insertAdjacentHTML('beforeend', \"<a href='/iz-js'>js</a>\")</script>"
+        b"</body></html>"
+    )
+    with FakeSite(extra={"/": Response(strana)}) as site:
+        snimljeno = snimi(site)
+    assert snimljeno.dom.internal_links == [f"{site.base_url}/o-nama", f"{site.base_url}/iz-js"]
+    assert snimljeno.dom.internal_links_total == 2
+
+
 # --------------------------------------------------------------------------- #
 # Merenje težine (§7.2) — najozbiljnija zamka u projektu
 # --------------------------------------------------------------------------- #

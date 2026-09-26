@@ -5,9 +5,43 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Callable
 
-from skener.checks.registry import Context, check, finding, ok, unknown
-from skener.fetch.urls import collapse_ws, path_group
-from skener.models import PageSnapshot, SiteSnapshot
+from skener.checks.registry import CheckSpec, Context, check, finding, not_applicable, ok, unknown
+from skener.fetch.urls import collapse_ws, normalize, path_group, same_site
+from skener.models import CheckResult, PageSnapshot, SiteSnapshot
+
+
+def _premalo_stranica(snapshot: SiteSnapshot, ctx: Context, spec: CheckSpec) -> CheckResult | None:
+    """Uzorak ima manje stranica nego što poređenje traži: `unknown` ili `not_applicable` (Z-21).
+
+    `not_applicable` samo kad sajt stvarno nema više stranica: budžet nije istekao, svi izvori
+    zajedno (mapa sajta, veze sa početne, veze iz renderovanog DOM-a) vide manje adresa od praga,
+    i bar jedan izvor vidi ono što crta JS. Inače `unknown`, a razlog kaže šta nije ispunjeno.
+    """
+    prag = ctx.th("thresholds.seo.duplicate_min_pages")
+    if sum(1 for p in snapshot.pages if p.status == 200) >= prag:
+        return None
+    if snapshot.budget.exhausted:
+        return unknown(spec, "pages_budget", prag=prag)
+    if snapshot.scanner_version.startswith("1."):
+        return unknown(spec, "v1_snapshot", verzija=snapshot.scanner_version, polje="home_links")
+
+    home = snapshot.home
+    base = home.final_url or home.url
+    izvori = [snapshot.home_links]
+    if snapshot.sitemap.status == 200 and not snapshot.sitemap.truncated:
+        izvori.append(snapshot.sitemap.urls)
+    b = ctx.browser
+    nivo2 = b is not None and b.status != "failed" and b.dom.internal_links_total is not None
+    if nivo2:
+        izvori.append(b.dom.internal_links)
+    # Početna je adresa sajta i kad nijedna veza ne vodi na nju.
+    adrese = {normalize(base)} | {u for izvor in izvori for u in map(normalize, izvor) if same_site(u, base)}
+    if len(adrese) >= prag:
+        return unknown(spec, "pages_sample", prag=prag, adresa=len(adrese))
+    prazan = home.text_length < ctx.th("escalation.empty_html_text_threshold") or not home.h1_count_raw
+    if not nivo2 and prazan:
+        return unknown(spec, "pages_js", prag=prag)
+    return not_applicable(spec, "few_pages", prag=prag, adresa=len(adrese))
 
 
 def _duplicates(
@@ -64,11 +98,13 @@ def canonical_missing(snapshot: SiteSnapshot, ctx: Context):
     level=1,
     category="seo",
     base_severity="critical",
-    requires=["pages"],
+    requires=["home"],
     description="Više stranica iz različitih delova sajta prijavljuje isti canonical.",
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim canonical-om",
 )
 def canonical_duplicate(snapshot: SiteSnapshot, ctx: Context):
+    if malo := _premalo_stranica(snapshot, ctx, canonical_duplicate.spec):
+        return malo
     min_pages = ctx.th("thresholds.seo.duplicate_min_pages")
     hit = _duplicates(snapshot, lambda p: p.canonical_normalized, min_pages)
     if not hit:
@@ -118,11 +154,13 @@ def title_missing(snapshot: SiteSnapshot, ctx: Context):
     level=1,
     category="seo",
     base_severity="high",
-    requires=["pages"],
+    requires=["home"],
     description="Više stranica iz različitih delova sajta ima identičan naslov.",
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim naslovom",
 )
 def title_duplicate(snapshot: SiteSnapshot, ctx: Context):
+    if malo := _premalo_stranica(snapshot, ctx, title_duplicate.spec):
+        return malo
     hit = _duplicates(snapshot, lambda p: collapse_ws(p.title), ctx.th("thresholds.seo.duplicate_min_pages"))
     if not hit:
         return ok(title_duplicate.spec)
@@ -169,11 +207,13 @@ def description_missing(snapshot: SiteSnapshot, ctx: Context):
     level=1,
     category="seo",
     base_severity="medium",
-    requires=["pages"],
+    requires=["home"],
     description="Više stranica iz različitih delova sajta ima identičan meta opis.",
     threshold="≥ 3 stranice iz ≥ 3 različite grupe putanja sa istim opisom",
 )
 def description_duplicate(snapshot: SiteSnapshot, ctx: Context):
+    if malo := _premalo_stranica(snapshot, ctx, description_duplicate.spec):
+        return malo
     hit = _duplicates(
         snapshot, lambda p: collapse_ws(p.meta_description), ctx.th("thresholds.seo.duplicate_min_pages")
     )

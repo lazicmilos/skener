@@ -340,6 +340,7 @@ TEXT: dict[str, str] = {
     "copied": "Kopirano ✓",
     "no_findings": "Nijedan nalaz — sajt je na proverenim tačkama uredan.",
     "unknowns": "Nije moglo da se proveri ({count})",
+    "not_applicable": "ne primenjuje se: {tekst}",
     "escalated_because": "Na nivo 2 poslat jer: ",
     "finding_meta": "· nivo {level} · {weight} bodova",
     "draft_clean": "Na sajtu {domain} nisam našao značajnije probleme.",
@@ -364,7 +365,6 @@ REASONS: dict[str, str] = {
     "requires.entry_response": "početna nije vratila nijedan odgovor (mrežna greška pre HTTP-a)",
     "requires.home": "početna strana nije uspešno dohvaćena",
     "requires.home_html": "sirovi HTML početne strane nije sačuvan",
-    "requires.pages": "uzorak ima manje od 3 uspešno dohvaćene stranice",
     "requires.robots": "zahtev za robots.txt nije izvršen (mrežna greška ili budžet)",
     "requires.sitemap": "zahtev za sitemap nije izvršen (mrežna greška ili budžet)",
     "requires.soft404": "obe sonde za lažni 404 nisu izvršene",
@@ -391,6 +391,21 @@ REASONS: dict[str, str] = {
     "text_too_short": "premalo teksta u sirovom HTML-u ({duzina} < {prag} znakova)",
     "unreachable_unsure": (
         "početna nije vratila odgovor ({vrsta}, pokušaja: {pokusaja}); iz toga se ne vidi da sajt ne radi"
+    ),
+    # provere duplikata kad uzorak ima manje stranica od praga (Z-21)
+    "pages_budget": (
+        "uzorak ima manje od {prag:n:stranice|stranice|stranica}, jer je budžet potrošen pre kraja"
+    ),
+    "pages_sample": (
+        "uzorak ima manje od {prag:n:stranice|stranice|stranica}, a sajt ima bar "
+        "{adresa:n:internu adresu|interne adrese|internih adresa}"
+    ),
+    "pages_js": (
+        "uzorak ima manje od {prag:n:stranice|stranice|stranica}, a veze koje crta JavaScript nisu "
+        "viđene (nivo 2 nije radio, a sirovi HTML početne je prazan ili bez h1)"
+    ),
+    "few_pages": (
+        "sajt ima {adresa:n:internu adresu|interne adrese|internih adresa}, a za poređenje treba bar {prag}"
     ),
     # zašto domen nije skeniran (lista „Nije skenirano")
     "entry_missing": "snapshot nema početnu (dohvatanje je puklo, vidi log)",

@@ -64,12 +64,18 @@
       "required": ["code", "evidence"],
       "properties": {"code": {"type": "string", "minLength": 1}, "evidence": {"type": "object"}}
     },
+    "check_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "reason"],
+      "properties": {"check_id": {"type": "string"}, "reason": {"$ref": "#/$defs/reason"}}
+    },
     "domain_report": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "domain", "industry", "final_url", "status", "level2_ran", "escalation_reasons", "findings",
-        "unknowns", "total_score", "max_finding_weight", "rank", "scanned_at", "reason"
+        "unknowns", "not_applicable", "total_score", "max_finding_weight", "rank", "scanned_at", "reason"
       ],
       "properties": {
         "domain": {"type": "string"},
@@ -79,14 +85,11 @@
         "level2_ran": {"type": "boolean"},
         "escalation_reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}},
         "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
-        "unknowns": {
+        "unknowns": {"type": "array", "items": {"$ref": "#/$defs/check_reason"}},
+        "not_applicable": {
+          "description": "Provere koje nemaju šta da provere na ovom sajtu; ne čine domen partial.",
           "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["check_id", "reason"],
-            "properties": {"check_id": {"type": "string"}, "reason": {"$ref": "#/$defs/reason"}}
-          }
+          "items": {"$ref": "#/$defs/check_reason"}
         },
         "total_score": {"type": "number", "minimum": 0},
         "max_finding_weight": {"type": "number", "minimum": 0},

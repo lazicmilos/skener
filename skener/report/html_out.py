@@ -273,6 +273,11 @@ def _details(report: DomainReport, lang: str) -> str:
         )
         naslov = _e(text("unknowns", lang, count=len(report.unknowns)))
         unknowns = f'<details class="unknowns"><summary>{naslov}</summary><ul>{items}</ul></details>'
+    unknowns += "".join(
+        f'<p class="tech"><code>{_e(n.check_id)}</code> — '
+        f'{_e(text("not_applicable", lang, tekst=razlog(n.reason, lang)))}</p>'
+        for n in report.not_applicable
+    )
     reasons = ""
     if report.escalation_reasons:
         razlozi = "; ".join(razlog(r, lang) for r in report.escalation_reasons)

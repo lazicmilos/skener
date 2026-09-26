@@ -16,19 +16,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from skener.config import get
-from skener.models import CheckResult, Finding, Reason
+from skener.models import BrowserSnapshot, CheckResult, Finding, Reason
 
 CheckFn = Callable[[Any, "Context"], CheckResult]
 
 
 @dataclass
 class Context:
-    """Sve što provera sme da zna: ko je domen i koji su pragovi."""
+    """Sve što provera sme da zna: ko je domen, koji su pragovi i, za nivo 1, šta je video nivo 2."""
 
     domain: str
     industry: str
     config: dict[str, Any]
     host_canonicalization: bool = False
+    browser: BrowserSnapshot | None = None
 
     def th(self, dotted: str) -> Any:
         return get(self.config, dotted)
@@ -98,6 +99,11 @@ def unknown(spec: CheckSpec, reason: str, **evidence: Any) -> CheckResult:
     return CheckResult(check_id=spec.check_id, status="unknown", reason=Reason(reason, evidence))
 
 
+def not_applicable(spec: CheckSpec, reason: str, **evidence: Any) -> CheckResult:
+    """Provera nema šta da proveri na ovom sajtu; razlog je obavezan, kao za `unknown` (Z-21)."""
+    return CheckResult(check_id=spec.check_id, status="not_applicable", reason=Reason(reason, evidence))
+
+
 def finding(
     spec: CheckSpec,
     ctx: Context,
@@ -144,7 +150,6 @@ REQUIREMENTS: dict[str, Callable[[Any], bool]] = {
     "entry_response": lambda s: s.entry is not None and s.entry.status is not None,
     "home": _home_ok,
     "home_html": lambda s: bool(s.home and s.home.raw_html),
-    "pages": lambda s: sum(1 for p in s.pages if p.status == 200) >= 3,
     "robots": lambda s: s.robots.status is not None,
     "sitemap": lambda s: s.sitemap.status is not None,
     "soft404": lambda s: len(s.soft404.probes) == 2 and all(p.status is not None for p in s.soft404.probes),

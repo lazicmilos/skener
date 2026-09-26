@@ -82,13 +82,21 @@ U izlaznom folderu su `index.html` (izveštaj), `findings.csv` (red po nalazu), 
 po domenu), `report.json` (ceo prolaz, za programe) i `snapshots/` sa sirovim podacima svakog
 domena. `--format` bira koje od prva četiri se pišu; snapshoti se pišu uvek.
 
+Rangiraju se samo sajtovi koji rade. Sajt koji se ne otvori ni u drugom pokušaju, najranije 60 s
+posle prvog (`http.second_attempt_after_s`), ide u odeljak „Ne rade", sa posebnim nacrtom mejla.
+To važi samo kad je stanje sigurno: ime ne postoji u DNS-u, ili server ne prihvata vezu ni preko
+https ni preko http. Domen koji iz drugog razloga nema početnu (DNS privremeno nedostupan, prekinuto
+TLS rukovanje, bilo kakav HTTP odgovor, adresa koja nije javna) ide u „Nije skenirano", sa razlogom,
+jer sajt možda radi, samo ga alat nije video. Tu je i broj izuzetih domena.
+
 ### JSON izveštaj
 
 `report.json` je ugovor za web aplikaciju, `skener diff`, CRM i kupca koda. Oblik opisuje šema
 [`skener/schema/report-2.json`](skener/schema/report-2.json), a verzija šeme je prvo polje
 dokumenta (`schema_version`). Uz nju idu verzija alata, vreme prolaza u UTC-u, trajanje po nivou,
 otisak konfiguracije (`config_digest`: sha256 pragova, množilaca i bodova, bez identiteta i
-paralelizma), okruženje (OS, Python, Chromium) i zbir po statusu.
+paralelizma), okruženje (OS, Python, Chromium) i zbir po statusu. Domeni su u tri liste:
+`ranked`, `unreachable` („Ne rade") i `not_scanned` (`failed`, sa razlogom u `reason`).
 
 Nalaz u JSON-u nema rečenicu, nego `check_id`, dokaz i `variant`. Rečenica se pravi iz dokaza,
 na jeziku onoga ko čita.
@@ -167,11 +175,11 @@ generiše ponovo; CI proverava samo da u njoj nije izostala nijedna provera iz r
 | `i18n.lang.invalid` | 1 | i18n | medium | lang ∈ {zxx, und, prazno} ili ne parsira kao BCP-47 |
 | `i18n.lang.mismatch` | 1 | i18n | medium | sadržaj prepoznat kao sr (ćirilica > 30 % ili dijakritici > 0,5 %) uz lang koji ne počinje sa sr |
 | `i18n.lang.missing` | 1 | i18n | medium | atribut lang ne postoji |
-| `infra.dns.unresolved` | 1 | infra | critical | DNS upit nije vratio adresu |
 | `infra.robots.missing` | 1 | infra | low | status 404 ili 410; ostali statusi osim 200 → unknown |
 | `infra.sitemap.missing` | 1 | infra | medium | status 404 ili 410, ili 200 sa 0 URL-ova; ostali statusi → unknown |
 | `infra.soft404` | 1 | infra | high | obe sonde vraćaju konačni status 200 (§5.2); status van {200, 404, 410} → unknown |
 | `infra.tls.invalid` | 1 | infra | high | TLS provera odbila sertifikat |
+| `infra.unreachable` | 1 | infra | critical | oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME, ili TCP veza odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok |
 | `perf.compression.missing` | 1 | perf | low | content-encoding ∉ {gzip, br, zstd, deflate} i HTML > 50 kB |
 | `perf.html.size` | 1 | perf | low | html_bytes > thresholds.perf.html_size_kb (500 kB) |
 | `perf.redirect.chain` | 1 | perf | low | broj skokova ≥ thresholds.perf.redirect_hops (3) |
@@ -315,8 +323,6 @@ proxy zaobišao proveru.
 ## Planirano, nije u v1
 
 - Kanonizacija hosta (sve četiri varijante `http/https` × `www/bez www`) kao podrazumevana provera.
-- Nalaz za sajt koji ne odgovara. Sada mrtav DNS daje `critical`, a server koji ne odgovara nema
-  nalaz, iako oba znače da se sajt ne otvara.
 - Core Web Vitals (LCP, CLS): vredni brojevi, ali traže pažljivije merenje nego što v1 zaslužuje.
 - `skener diff` između dva prolaza. Rečenica „sajt je od marta postao 3 MB teži" je dobar uvod u mejl.
 - Provera strukturiranih podataka (`schema.org`), koja restoranima i klinikama ima stvarnu vrednost.

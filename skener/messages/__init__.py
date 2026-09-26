@@ -8,7 +8,8 @@ ne tekst.
 
 - `{broj:n:oblik|oblik|oblik}` daje broj i imenicu u pravilnom obliku („3 kopije");
   srpski ima tri oblika, engleski dva;
-- `{lista:join: → }` spaja listu datim razdvajačem.
+- `{lista:join: → }` spaja listu datim razdvajačem;
+- `{vreme:utc}` skraćuje UTC vreme iz dokaza na „2026-09-22 09:00"; zonu piše šablon.
 
 U rečenici za klijenta decimalni broj se piše po pravilima jezika („14,9" ili „14.9"), a
 tehnička rečenica ga ostavlja kakav jeste. Tehnički kodovi iz dokaza (izvor uzorka,
@@ -56,6 +57,8 @@ class _Formatter(string.Formatter):
             return f"{value} {self.cat.plural(value, format_spec[2:].split('|'))}"
         if format_spec.startswith("join:"):
             return format_spec[5:].join(str(item) for item in value)
+        if format_spec == "utc":
+            return value[:16].replace("T", " ")
         if self.localize and isinstance(value, float) and not format_spec:
             return self.cat.DECIMAL(value)
         return super().format_field(value, format_spec)

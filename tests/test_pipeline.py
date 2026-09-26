@@ -19,6 +19,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def brza_konfiguracija() -> dict:
     config = load_config()
     config["http"]["delay_ms"] = [0, 0]
+    config["http"]["second_attempt_after_s"] = 0
     return config
 
 
@@ -44,8 +45,9 @@ def test_recheck_bez_snapshota_je_greska_ulaza(tmp_path):
 
 def test_rezultat_nosi_zbir_po_statusu_i_vreme():
     rezultat = pipeline.recheck(FIXTURES, load_config())
-    assert set(rezultat.summary) == {"scanned", "partial", "failed", "excluded"}
-    assert sum(rezultat.summary.values()) == len(rezultat.ranked), "recheck nema izuzetih"
+    assert set(rezultat.summary) == {"scanned", "partial", "failed", "unreachable", "excluded"}
+    svi = rezultat.ranked + rezultat.unreachable + rezultat.not_scanned
+    assert sum(rezultat.summary.values()) == len(svi), "recheck nema izuzetih"
     assert rezultat.started_at.endswith("Z") and rezultat.finished_at >= rezultat.started_at
     assert rezultat.duration_s["total"] >= 0
 
@@ -168,5 +170,6 @@ def test_izuzet_domen_ne_dobija_nijedan_zahtev(monkeypatch):
             pipeline.scan(targets, brza_konfiguracija(), level="1", excluded=["127.0.0.1"])
         )
     assert izuzet.requests == [], "izuzet domen ne sme da dobije nijedan zahtev"
-    assert [r.domain for r in rezultat.ranked] == ["drugi.test"], "u izveštaju nema imena izuzetog"
+    svi = rezultat.ranked + rezultat.unreachable + rezultat.not_scanned
+    assert [r.domain for r in svi] == ["drugi.test"], "u izveštaju nema imena izuzetog"
     assert rezultat.summary["excluded"] == 1

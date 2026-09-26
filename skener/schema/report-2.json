@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "scanner_version", "started_at", "finished_at", "duration_s",
-    "config_digest", "environment", "summary", "ranked"
+    "config_digest", "environment", "summary", "ranked", "unreachable", "not_scanned"
   ],
   "properties": {
     "schema_version": {"const": "2.0"},
@@ -39,10 +39,20 @@
     "summary": {
       "description": "Broj domena po statusu; izuzeti domeni su samo broj, bez imena.",
       "type": "object",
-      "required": ["scanned", "partial", "failed", "excluded"],
+      "required": ["scanned", "partial", "failed", "unreachable", "excluded"],
       "additionalProperties": {"type": "integer", "minimum": 0}
     },
-    "ranked": {"type": "array", "items": {"$ref": "#/$defs/domain_report"}}
+    "ranked": {"type": "array", "items": {"$ref": "#/$defs/domain_report"}},
+    "unreachable": {
+      "description": "Sajtovi koji se ne otvaraju ni u drugom pokušaju; razlog je nalaz infra.unreachable.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/domain_report"}
+    },
+    "not_scanned": {
+      "description": "Domeni sa statusom failed, sa razlogom. Izuzeti domeni su samo broj u summary.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/domain_report"}
+    }
   },
   "$defs": {
     "utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
@@ -59,13 +69,13 @@
       "additionalProperties": false,
       "required": [
         "domain", "industry", "final_url", "status", "level2_ran", "escalation_reasons", "findings",
-        "unknowns", "total_score", "max_finding_weight", "rank", "scanned_at"
+        "unknowns", "total_score", "max_finding_weight", "rank", "scanned_at", "reason"
       ],
       "properties": {
         "domain": {"type": "string"},
         "industry": {"enum": ["hotel", "restoran", "zdravstvo", "ecommerce", "b2b", "institucija", "ostalo"]},
         "final_url": {"type": ["string", "null"]},
-        "status": {"enum": ["scanned", "partial", "failed"]},
+        "status": {"enum": ["scanned", "partial", "failed", "unreachable"]},
         "level2_ran": {"type": "boolean"},
         "escalation_reasons": {"type": "array", "items": {"$ref": "#/$defs/reason"}},
         "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
@@ -80,8 +90,12 @@
         },
         "total_score": {"type": "number", "minimum": 0},
         "max_finding_weight": {"type": "number", "minimum": 0},
-        "rank": {"type": "integer", "minimum": 1},
-        "scanned_at": {"type": "string"}
+        "rank": {"type": "integer", "minimum": 0, "description": "0 = nije rangiran (unreachable, failed)"},
+        "scanned_at": {"type": "string"},
+        "reason": {
+          "description": "Zašto je domen failed; null za ostale.",
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/reason"}]
+        }
       }
     },
     "finding": {

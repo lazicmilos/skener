@@ -78,7 +78,7 @@ def test_odbijena_veza_na_dozvoljenoj_adresi_nije_blokada():
     cfg = load_config()
     cfg["net"]["allowed_private"] = ["127.0.0.1:1"]
     snapshot = _skeniraj("http://127.0.0.1:1", cfg)
-    assert snapshot.entry.error_kind == "connection"
+    assert snapshot.entry.error_kind == "no_connection"
 
 
 def test_zastita_ne_nestaje_tiho_kad_se_httpx_promeni(monkeypatch):
@@ -102,7 +102,7 @@ def test_ime_bez_dns_zapisa_ostaje_dns_greska(monkeypatch):
         raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
 
     monkeypatch.setattr(http, "_razresi", nema_zapisa)
-    assert _skeniraj("nepostoji.test").entry.error_kind == "dns"
+    assert _skeniraj("nepostoji.test").entry.error_kind == "dns_nxdomain"
 
 
 def test_blokiran_domen_nije_unreachable():

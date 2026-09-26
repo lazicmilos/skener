@@ -126,21 +126,41 @@ def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
 
 
 @check(
-    "infra.dns.unresolved",
+    "infra.unreachable",
     level=1,
     category="infra",
     base_severity="critical",
     requires=["entry"],
-    description="Domen se ne razrešava preko DNS-a.",
-    threshold="DNS upit nije vratio adresu",
+    description=(
+        "Sajt se ne otvara ni u drugom pokušaju: ime ne postoji u DNS-u, ili server ne prihvata "
+        "vezu ni preko https ni preko http. Domen ide u listu „Ne rade”, a ne u rangiranje."
+    ),
+    threshold=(
+        "oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME, ili TCP veza "
+        "odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok"
+    ),
 )
-def dns_unresolved(snapshot: SiteSnapshot, ctx: Context):
+def unreachable(snapshot: SiteSnapshot, ctx: Context):
     entry = snapshot.entry
-    if entry.error_kind != "dns":
-        return ok(dns_unresolved.spec)
+    if entry.status is not None:
+        return ok(unreachable.spec)
+    if snapshot.scanner_version.startswith("1."):
+        verzija = snapshot.scanner_version
+        return unknown(unreachable.spec, "v1_snapshot", verzija=verzija, polje="entry_attempts")
+    razlog = snapshot.entry_unreachable()
+    pokusaji = snapshot.entry_attempts
+    # Jedan pokušaj, privremen DNS, prekinuto TLS rukovanje ili blokada ne dokazuju da sajt ne radi.
+    if razlog is None or len(pokusaji) < 2:
+        return unknown(unreachable.spec, "unreachable_unsure", vrsta=entry.error_kind, pokusaja=len(pokusaji))
     return finding(
-        dns_unresolved.spec,
+        unreachable.spec,
         ctx,
-        evidence={"detalj": entry.error_detail or "nepoznato", "razresenih_adresa": 0},
+        evidence={
+            "razlog": razlog,
+            "broj_pokusaja": len(pokusaji),
+            "prvi_pokusaj": pokusaji[0],
+            "drugi_pokusaj": pokusaji[-1],
+            "detalj": entry.error_detail or "",
+        },
         urls=[entry.requested_url],
     )

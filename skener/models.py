@@ -21,8 +21,9 @@ CheckStatus = Literal["ok", "finding", "unknown"]
 Industry = Literal[
     "hotel", "restoran", "zdravstvo", "ecommerce", "b2b", "institucija", "ostalo"
 ]
+# `unreachable`: sajt se ne otvara ni posle drugog pokušaja, pa ide u listu „Ne rade" (Z-20).
 # `excluded`: administrator je tražio da se sajt ne skenira; u izveštaju je samo njihov broj.
-DomainStatus = Literal["scanned", "partial", "failed", "excluded"]
+DomainStatus = Literal["scanned", "partial", "failed", "unreachable", "excluded"]
 
 # JSON izveštaj: dodato polje podiže drugi broj, a obrisano ili promenjeno prvi (README).
 SCHEMA_VERSION = "2.0"
@@ -208,11 +209,29 @@ class SiteSnapshot:
     sample_source: Literal["sitemap", "links", "none"] = "none"
     budget: Budget = field(default_factory=Budget)
     errors: list[SnapshotError] = field(default_factory=list)
+    # Kad je ulaz pokušan, u UTC-u. Drugi pokušaj postoji samo kad je prvi izgledao kao da sajt
+    # ne radi (Z-20); snapshot je tada iz drugog.
+    entry_attempts: list[str] = field(default_factory=list)
 
     @property
     def home(self) -> PageSnapshot | None:
         """Početna strana je po konstrukciji prva u uzorku."""
         return self.pages[0] if self.pages else None
+
+    def entry_unreachable(self) -> str | None:
+        """`dns` ili `no_response` kad ovaj pokušaj ulaza pokazuje da sajt ne radi, inače `None`.
+
+        Sigurno je samo ovo: ime ne postoji u DNS-u, ili TCP veza nije uspostavljena ni na
+        https ni na http. Privremen DNS, prekinuto TLS rukovanje, bilo kakav HTTP odgovor i
+        blokada privatne adrese to nisu, jer sajt možda radi, samo ga mi nismo videli (Z-20).
+        """
+        entry = self.entry
+        if entry is None or entry.status is not None:
+            return None
+        if entry.error_kind == "dns_nxdomain":
+            return "dns"
+        sheme = [e.kind for e in self.errors if e.stage == "entry"]
+        return "no_response" if sheme == ["no_connection", "no_connection"] else None
 
 
 # --------------------------------------------------------------------------- #
@@ -338,8 +357,10 @@ class DomainReport:
     unknowns: list[Unknown] = field(default_factory=list)
     total_score: float = 0.0
     max_finding_weight: float = 0.0
-    rank: int = 0
+    rank: int = 0  # 0 = nije rangiran (`unreachable`, `failed`)
     scanned_at: str = ""
+    # Zašto je `failed`, za listu „Nije skenirano". Za `unreachable` razlog je nalaz `infra.unreachable`.
+    reason: Reason | None = None
 
     @property
     def rank_key(self) -> tuple[float, float]:
@@ -385,6 +406,8 @@ class ScanResult:
     environment: dict[str, str | None] = field(default_factory=dict)
     summary: dict[str, int] = field(default_factory=dict)
     ranked: list[DomainReport] = field(default_factory=list)
+    unreachable: list[DomainReport] = field(default_factory=list)
+    not_scanned: list[DomainReport] = field(default_factory=list)  # `failed`; izuzeti su samo broj
 
 
 # --------------------------------------------------------------------------- #

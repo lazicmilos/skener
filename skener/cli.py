@@ -163,7 +163,8 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
 
 def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
-    reports = result.ranked
+    # CSV i HTML dobijaju sve domene; HTML ih sam deli na rangirane, „Ne rade" i „Nije skenirano".
+    reports = result.ranked + result.unreachable + result.not_scanned
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     formats = {f.strip() for f in args.format.split(",") if f.strip()}
@@ -185,7 +186,7 @@ def _emit(result: ScanResult, config: dict, args: argparse.Namespace) -> None:
 
     nalaza = sum(len(r.findings) for r in reports)
     print(f"\n{len(reports)} domena · {nalaza} nalaza · izlaz u {out}/", file=sys.stderr)
-    for report in reports[:10]:
+    for report in result.ranked[:10]:
         top = report.findings[0].check_id if report.findings else "—"
         print(
             f"  {report.rank:>3}. {report.domain:<28} skor {report.total_score:>7.1f}"

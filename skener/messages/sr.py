@@ -34,8 +34,16 @@ DECIMAL = decimalni
 # Tehnički kodovi iz dokaza, onako kako se čitaju u rečenici.
 CODES: dict[str, dict[object, str]] = {
     "kodiranje": {None: "nema"},
-    "vrsta": {None: "nepoznato"},
+    "vrsta": {
+        None: "nepoznato",
+        "dns_temporary": "DNS privremeno nedostupan",
+        "blocked": "zaštita od SSRF-a",
+    },
     "uzorak": {"sitemap": "sitemap", "links": "interni linkovi sa početne", "none": "samo početna"},
+    "razlog": {
+        "dns": "domen nema zapis koji ga povezuje sa serverom",
+        "no_response": "server nije prihvatio vezu ni preko https ni preko http",
+    },
 }
 
 _TEZINA = (
@@ -255,12 +263,12 @@ FINDINGS: dict[str, dict] = {
         ),
         "tech": "TLS greška: {greska}",
     },
-    "infra.dns.unresolved": {
+    "infra.unreachable": {
         "client": (
-            "Domen se uopšte ne otvara — ne postoji zapis koji ga povezuje sa serverom. "
-            "Za posetioca i za Google sajt trenutno ne postoji."
+            "Sajt se nije otvorio ni u jednom od {broj_pokusaja} pokušaja ({prvi_pokusaj:utc} i "
+            "{drugi_pokusaj:utc} UTC): {razlog}."
         ),
-        "tech": "DNS ne razrešava: {detalj}",
+        "tech": "pokušaji {prvi_pokusaj} i {drugi_pokusaj}, poslednja greška: {detalj}",
     },
     # ------------------------------------------------------------------ a11y
     "a11y.img.alt.missing": {
@@ -285,6 +293,7 @@ TEXT: dict[str, str] = {
     "card_scanned": "Skenirano",
     "card_partial": "Delimično",
     "card_failed": "Neuspešno",
+    "card_unreachable": "Ne rade",
     "card_level2": "Na nivou 2",
     "card_excluded": "Izuzeto na zahtev",
     "card_duration": "Trajanje",
@@ -303,6 +312,17 @@ TEXT: dict[str, str] = {
     "yes": "da",
     "no": "ne",
     "by_domain": "Po domenu",
+    "unreachable": "Ne rade",
+    "unreachable_note": (
+        "Sajtovi koji se nisu otvorili ni u drugom pokušaju. Nisu u rangiranju, a nacrt mejla za\n"
+        "njih je poseban."
+    ),
+    "not_scanned": "Nije skenirano",
+    "not_scanned_note": (
+        "Sajtovi koje alat nije pregledao. Možda rade, pa nisu ni u rangiranju ni u „Ne rade”."
+    ),
+    "excluded_count": "Izuzeto na zahtev administratora: {count}",
+    "col_reason": "Razlog",
     "assumption_html": (
         "<b>Pretpostavka za procenu vremena učitavanja:</b> efektivna brzina\n"
         "{speed} Mb/s ({mb_per_s} MB/s, spora 4G veza) uz {overhead} s režijskog\n"
@@ -326,6 +346,10 @@ TEXT: dict[str, str] = {
     "draft_opening": "Poštovani,\n\npregledao sam sajt {domain} i primetio sledeće:\n\n",
     "draft_closing": (
         "\n\nAko vas zanima, mogu da pošaljem detaljan pregled sa predlogom šta prvo popraviti.\n"
+    ),
+    "draft_unreachable": (
+        "Poštovani,\n\npišem u vezi sa sajtom {domain}. {recenica}\n\n"
+        "Ako vam je potrebna pomoć oko sajta, rado ću pomoći.\n"
     ),
     "severity_critical": "KRITIČNO",
     "severity_high": "VISOKO",
@@ -365,6 +389,13 @@ REASONS: dict[str, str] = {
     "h1_timeout": "stranica nije dovršila učitavanje, h1 može da stigne kasnije",
     "images_timeout": "stranica nije dovršila učitavanje, slike nisu prebrojane",
     "text_too_short": "premalo teksta u sirovom HTML-u ({duzina} < {prag} znakova)",
+    "unreachable_unsure": (
+        "početna nije vratila odgovor ({vrsta}, pokušaja: {pokusaja}); iz toga se ne vidi da sajt ne radi"
+    ),
+    # zašto domen nije skeniran (lista „Nije skenirano")
+    "entry_missing": "snapshot nema početnu (dohvatanje je puklo, vidi log)",
+    "entry_status": "početna je vratila status {status}",
+    "entry_error": "{vrsta}: {detalj}",
     # eskalacija na nivo 2
     "raw_text_short": "sirovi HTML ima {znakova} znakova teksta (< {prag})",
     "no_h1_raw": "sirovi HTML nema nijedan h1 — sadržaj se verovatno crta iz JS-a",

@@ -201,9 +201,9 @@ def _result(
     *,
     excluded: int = 0,
 ) -> ScanResult:
-    ranked = rank(reports)
-    counts = Counter(report.status for report in ranked)
+    counts = Counter(report.status for report in reports)
     counts["excluded"] = excluded
+    po_imenu = sorted(reports, key=lambda r: r.domain)
     return ScanResult(
         started_at=started_at,
         finished_at=_now(),
@@ -211,7 +211,9 @@ def _result(
         config_digest=digest(config),
         environment=_environment(browsers),
         summary={status: counts[status] for status in typing.get_args(DomainStatus)},
-        ranked=ranked,
+        ranked=rank(reports),
+        unreachable=[r for r in po_imenu if r.status == "unreachable"],
+        not_scanned=[r for r in po_imenu if r.status == "failed"],
     )
 
 

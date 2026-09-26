@@ -28,6 +28,12 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   `host:port` naveden u `[net] allowed_private`. Nivo 1 više ne čita `HTTP(S)_PROXY`.
 - `CheckSpec` više nema šablone `message_template` i `tech_template`, a `check()` ne prima
   `message` ni `tech`. Modul `skener.checks.srpski` je prešao u `skener.messages.sr`.
+- `infra.dns.unresolved` je obrisan. Sajt koji se ne otvori ni u drugom pokušaju dobija nalaz
+  `infra.unreachable` i status `unreachable`, i ide u listu „Ne rade" umesto u rangiranje.
+  `rank()` rangira samo `scanned` i `partial`, a ostali domeni imaju `rank` 0. JSON ima liste
+  `unreachable` i `not_scanned`, a izveštaj domena polje `reason` (zašto je `failed`).
+- Vrsta greške `dns` u snapshotu je podeljena na `dns_nxdomain`, `dns_temporary` i `dns` (ostale
+  DNS greške). TCP veza koja nije uspostavljena je `no_connection`.
 
 ### Dodato
 
@@ -42,6 +48,10 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 - Ceo prolaz je u modulu `skener.pipeline`, pa ga web aplikacija zove isto kao komandna linija
   ([ADR-008](docs/adr/ADR-008-pipeline.md)).
 - Log tokom prolaza ima brojač napretka („nivo 1: 43/200 gotovo").
+- Sajt koji posle prvog pokušaja izgleda kao da ne radi ide na kraj reda nivoa 1 i dobija drugi
+  pokušaj, sa novim budžetom, najranije `http.second_attempt_after_s` (60 s) posle prvog.
+- HTML izveštaj ima odeljke „Ne rade", sa posebnim nacrtom mejla, i „Nije skenirano", sa
+  razlogom i brojem izuzetih domena.
 - Greška i upozorenje u listi domena navode red u kom su, onako kako ga prikazuje Excel
   („red 3: domen se ponavlja u listi").
 

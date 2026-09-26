@@ -286,11 +286,11 @@ def test_klasifikacija_izuzetaka(exc, expected):
 def test_dns_greska_se_prepoznaje_kroz_lanac_uzroka():
     try:
         try:
-            raise socket.gaierror(-2, "Name or service not known")
+            raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
         except socket.gaierror as cause:
             raise httpx.ConnectError("greška", request=None) from cause
     except httpx.ConnectError as exc:
-        assert _classify(exc)[0] == "dns"
+        assert _classify(exc)[0] == "dns_nxdomain"
 
 
 def test_istekao_sertifikat_je_tls_a_ne_pad():
@@ -589,7 +589,7 @@ ISHODI = {
     "rukovanje": ("tls_handshake", "UNEXPECTED_EOF_WHILE_READING"),
     "veza": ("connection", "ConnectError: odbijeno"),
     "istek": ("connect_timeout", "ConnectTimeout"),
-    "dns": ("dns", "Name or service not known"),
+    "dns": ("dns_nxdomain", "Name or service not known"),
 }
 
 
@@ -660,7 +660,8 @@ def test_prelazi_stanja_ulaznog_zahteva(monkeypatch, tabela, ulaz, sertifikat, p
     assert rezultati["infra.tls.invalid"].status == sertifikat
     if tabela.get(("https", True)) == "dns":
         assert len(fetcher.poslato) == 1, "posle DNS greške nema drugih zahteva"
-        assert rezultati["infra.dns.unresolved"].status == "finding"
+        # Tek drugi pokušaj, koji vodi `scan_domains`, dokazuje da sajt ne radi (Z-20).
+        assert rezultati["infra.unreachable"].status == "unknown"
 
 
 # --------------------------------------------------------------------------- #

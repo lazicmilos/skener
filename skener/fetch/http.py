@@ -48,6 +48,9 @@ log = logging.getLogger("skener.fetch")
 # Statusi na koje se odustaje od domena za ovaj prolaz (§8.3) — ne pokušava se ponovo.
 ODUSTANI_STATUSI = {429, 503}
 PROBE_SUFFIXES = ("", ".html")
+# DNS greška je greška imena, pa ni http na istom imenu ne pomaže.
+DNS = frozenset({"dns", "dns_nxdomain", "dns_temporary"})
+DNS_ERRNO = {socket.EAI_NONAME: "dns_nxdomain", socket.EAI_AGAIN: "dns_temporary"}
 
 
 @dataclass
@@ -107,19 +110,26 @@ class DomainBudget:
         )
 
 
-def _classify(exc: Exception) -> tuple[str, str]:
-    """Mrežni izuzetak → (vrsta, detalj). Vrsta odlučuje da li se ponavlja (§4.6)."""
+def _lanac(exc: BaseException) -> list[BaseException]:
+    """Izuzetak i svi njegovi uzroci: httpx umota pravu grešku u dva-tri svoja sloja."""
     chain: list[BaseException] = []
     current: BaseException | None = exc
     while current is not None and current not in chain:
         chain.append(current)
         current = current.__cause__ or current.__context__
+    return chain
 
-    for link in chain:
+
+def _classify(exc: Exception) -> tuple[str, str]:
+    """Mrežni izuzetak → (vrsta, detalj). Vrsta odlučuje da li se ponavlja (§4.6)."""
+    for link in _lanac(exc):
         if isinstance(link, addresses.BlockedAddress):
             return "blocked", str(link)
+        if isinstance(link, NoConnection):
+            return "no_connection", str(link)
         if isinstance(link, socket.gaierror):
-            return "dns", str(link)
+            # Konstante iz `socket`, ne brojevi: brojevi se razlikuju između Linux-a i Windows-a.
+            return DNS_ERRNO.get(link.errno, "dns"), str(link)
         if isinstance(link, ssl.SSLCertVerificationError):
             return "tls", str(link)
         if isinstance(link, ssl.SSLError):
@@ -143,6 +153,15 @@ async def _razresi(host: str, port: int) -> list[tuple]:
     return await asyncio.get_running_loop().getaddrinfo(
         host, port, type=socket.SOCK_STREAM, flags=socket.AI_ADDRCONFIG
     )
+
+
+class NoConnection(httpcore.ConnectError):
+    """TCP veza nije uspostavljena ni sa jednom adresom: odbijena, nedostupna ili istekla.
+
+    Nastaje samo u `_JavneAdrese.connect_tcp`, pre TLS-a i pre HTTP-a, pa je jedino ona dokaz da
+    server ne odgovara (Z-20). Prekid posle uspostavljene veze to nije: server je tu, samo ne
+    odgovara nama (BUG-004).
+    """
 
 
 class _JavneAdrese(httpcore.AsyncNetworkBackend):
@@ -175,14 +194,21 @@ class _JavneAdrese(httpcore.AsyncNetworkBackend):
         if not javne:
             raise addresses.BlockedAddress(f"adresa nije javna: {host} → {', '.join(ips) or '—'}")
         greska: Exception | None = None
+        prihvacena = False
         for ip in javne:
             try:
                 return await self._inner.connect_tcp(
                     ip, port, timeout=timeout, local_address=local_address, socket_options=socket_options
                 )
+            except httpcore.ConnectTimeout as exc:
+                raise NoConnection(f"{ip}:{port} connect timeout") from exc
             except httpcore.ConnectError as exc:
                 greska = exc
-        raise greska  # type: ignore[misc]
+                # Reset stiže tek posle prihvaćene veze, pa i kad ga vidi još `connect`, server je tu.
+                prihvacena = prihvacena or any(isinstance(e, ConnectionResetError) for e in _lanac(exc))
+        if prihvacena:
+            raise greska  # type: ignore[misc]
+        raise NoConnection(f"{', '.join(javne)}:{port} {greska}") from greska
 
 
 class Fetcher:
@@ -306,7 +332,7 @@ class Fetcher:
 
 def _should_retry(outcome: Outcome) -> bool:
     """4xx je odgovor, ne greška — bez ponovnog pokušaja (§4.6)."""
-    if outcome.error_kind in {"connect_timeout", "read_timeout", "timeout", "connection"}:
+    if outcome.error_kind in {"no_connection", "connect_timeout", "read_timeout", "timeout", "connection"}:
         return True
     return outcome.status is not None and 500 <= outcome.status < 600
 
@@ -321,11 +347,13 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     budget = DomainBudget(
         get(cfg, "http.max_requests_per_domain"), get(cfg, "http.max_seconds_per_domain")
     )
+    fetched_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     snapshot = SiteSnapshot(
         domain=domain,
         industry=target.industry,
-        fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        fetched_at=fetched_at,
         scanner_version=__version__,
+        entry_attempts=[fetched_at],
     )
     problem = addresses.input_problem(domain, addresses.allowlist(cfg))
     if problem:
@@ -338,7 +366,8 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
     entry_outcome, tls_error = await _fetch_entry(fetcher, domain, budget, snapshot)
     snapshot.entry = _entry_from(entry_outcome, tls_error)
     verify = tls_error is None
-    if entry_outcome.error_kind in {"dns", "blocked"}:
+    # Sajt koji ne prihvata vezu ni na https ni na http ne dobija ni robots.txt ni mapu sajta.
+    if entry_outcome.error_kind in DNS | {"blocked"} or snapshot.entry_unreachable():
         snapshot.budget = budget.snapshot()
         return snapshot
 
@@ -422,11 +451,14 @@ async def _fetch_entry(
         retry = await fetcher.request(candidates[0], budget, verify=False)
         return (retry if retry.ok else outcome), outcome.error_detail or "nepoznata TLS greška"
 
-    if not outcome.ok and outcome.error_kind not in {"dns", "budget", "blocked"} and len(candidates) > 1:
+    if not outcome.ok and outcome.error_kind not in DNS | {"budget", "blocked"} and len(candidates) > 1:
         snapshot.errors.append(SnapshotError("entry", outcome.error_kind or "?", outcome.error_detail or ""))
         fallback = await fetcher.request(candidates[1], budget)
         if fallback.ok:
             return fallback, None
+        # I greška http-a, jer „ne radi" traži da ni https ni http nisu dobili vezu (Z-20).
+        greska = SnapshotError("entry", fallback.error_kind or "?", fallback.error_detail or "")
+        snapshot.errors.append(greska)
     return outcome, None
 
 
@@ -599,40 +631,54 @@ async def scan_domains(
 ) -> list[SiteSnapshot]:
     """Snapshot ide na disk čim je domen gotov — ako proces pukne na 190., imaš 189 (§8.2).
 
-    `on_done` se zove za svaki završen domen, posle upisa na disk.
+    `on_done` se zove za svaki završen domen, posle upisa na disk. Domen koji posle prvog
+    pokušaja izgleda kao da ne radi ide na kraj reda i dobija drugi pokušaj, sa novim
+    budžetom, najranije `http.second_attempt_after_s` posle prvog (Z-20).
     """
     targets = list(targets)
     results: list[SiteSnapshot] = []
     # Budžet od 25 s je za rad na domenu, ne za čekanje u redu iza ostalih 199:
     # `DomainBudget` nastaje u `fetch_site`, pa domen ulazi tamo tek kad dobije red.
     in_flight = asyncio.Semaphore(get(config, "http.domain_concurrency"))
+    second_after = get(config, "http.second_attempt_after_s")
 
     async with Fetcher(config) as fetcher:
 
-        async def one(target: DomainInput) -> SiteSnapshot:
+        async def attempt(target: DomainInput) -> SiteSnapshot:
             async with in_flight:
                 log.info("nivo 1 počinje", extra={"domain": target.domain})
                 try:
-                    snapshot = await fetch_site(fetcher, target)
+                    return await fetch_site(fetcher, target)
                 except Exception as exc:  # noqa: BLE001 — granica domena
                     log.error("nivo 1 pukao: %s", exc, extra={"domain": target.domain})
-                    snapshot = SiteSnapshot(
+                    return SiteSnapshot(
                         domain=target.domain,
                         industry=target.industry,
                         fetched_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                         errors=[SnapshotError("fetch", type(exc).__name__, str(exc))],
                     )
-                if snapshot_dir is not None:
-                    store.write_site(snapshot_dir, snapshot)
-                log.info(
-                    "nivo 1 gotov: %d stranica, %d zahteva",
-                    len(snapshot.pages),
-                    snapshot.budget.requests_made,
-                    extra={"domain": target.domain},
-                )
-                if on_done is not None:
-                    on_done(snapshot)
-                return snapshot
+
+        async def one(target: DomainInput) -> SiteSnapshot:
+            snapshot = await attempt(target)
+            if razlog := snapshot.entry_unreachable():
+                domen = {"domain": target.domain}
+                log.info("ne radi (%s); drugi pokušaj za %g s", razlog, second_after, extra=domen)
+                # Čeka van semafora: mesto u redu za to vreme dobija drugi domen.
+                await asyncio.sleep(second_after)
+                first = snapshot.entry_attempts
+                snapshot = await attempt(target)
+                snapshot.entry_attempts = first + snapshot.entry_attempts
+            if snapshot_dir is not None:
+                store.write_site(snapshot_dir, snapshot)
+            log.info(
+                "nivo 1 gotov: %d stranica, %d zahteva",
+                len(snapshot.pages),
+                snapshot.budget.requests_made,
+                extra={"domain": target.domain},
+            )
+            if on_done is not None:
+                on_done(snapshot)
+            return snapshot
 
         # Goli `gather` bi jednim izuzetkom oborio ceo prolaz — tačno greška iz §8.2.
         gathered = await asyncio.gather(*(one(t) for t in targets), return_exceptions=True)

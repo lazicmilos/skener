@@ -104,8 +104,18 @@ def _badge(severity: str, lang: str) -> str:
     return f'<span class="tag" style="color:{fg};background:{bg}">{glyph} {_e(label)}</span>'
 
 
+def _ne_radi(report: DomainReport):
+    return next(f for f in report.findings if f.check_id == "infra.unreachable")
+
+
 def email_draft(report: DomainReport, lang: str = "sr") -> str:
-    """Tri rečenice od tri najteža nalaza — toliko staje u mejl (§9.4)."""
+    """Tri rečenice od tri najteža nalaza — toliko staje u mejl (§9.4).
+
+    Sajt koji ne radi dobija svoj nacrt, bez „primetio sam sledeće probleme" (Z-20).
+    """
+    if report.status == "unreachable":
+        recenica = poruka(_ne_radi(report), lang).client
+        return text("draft_unreachable", lang, domain=report.domain, recenica=recenica)
     if not report.findings:
         return text("draft_clean", lang, domain=report.domain)
     lines = [f"{i}. {poruka(f, lang).client}" for i, f in enumerate(report.top_findings, start=1)]
@@ -124,17 +134,20 @@ def render(
     def t(key: str, **values) -> str:
         return _e(text(key, lang, **values))
 
-    scanned = sum(1 for r in reports if r.status == "scanned")
-    partial = sum(1 for r in reports if r.status == "partial")
-    failed = sum(1 for r in reports if r.status == "failed")
+    def sa(status: str) -> list[DomainReport]:
+        return [r for r in reports if r.status == status]
+
+    # Rangiranje je samo za sajtove koji rade; ostali imaju svoje odeljke (Z-20).
+    ranked = [r for r in reports if r.status in ("scanned", "partial")]
     level2 = sum(1 for r in reports if r.level2_ran)
     generated = reports[0].scanned_at if reports else ""
 
     cards = [
         (t("card_domains"), len(reports)),
-        (t("card_scanned"), scanned),
-        (t("card_partial"), partial),
-        (t("card_failed"), failed),
+        (t("card_scanned"), len(sa("scanned"))),
+        (t("card_partial"), len(sa("partial"))),
+        (t("card_unreachable"), len(sa("unreachable"))),
+        (t("card_failed"), len(sa("failed"))),
         (t("card_level2"), level2),
     ]
     if excluded:
@@ -177,11 +190,11 @@ def render(
 {headers}
 </tr></thead>
 <tbody>
-{"".join(_row(r, lang) for r in reports)}
+{"".join(_row(r, lang) for r in ranked)}
 </tbody></table>
-
+{_unreachable(sa("unreachable"), lang)}{_not_scanned(sa("failed"), excluded, lang)}
 <h2>{t("by_domain")}</h2>
-{"".join(_details(r, lang) for r in reports)}
+{"".join(_details(r, lang) for r in ranked)}
 
 <footer>
 <p>{assumption}</p>
@@ -205,6 +218,47 @@ def _row(report: DomainReport, lang: str) -> str:
         f"<td>{_e(text('yes' if report.level2_ran else 'no', lang))}</td>"
         f"<td>{_e(report.status)}</td></tr>"
     )
+
+
+def _unreachable(reports: Sequence[DomainReport], lang: str) -> str:
+    if not reports:
+        return ""
+    copy = _e(text("copy_draft", lang))
+    rows = "".join(
+        f"<tr><td><b>{_e(r.domain)}</b></td><td>{_e(r.industry)}</td>"
+        f"<td>{_e(poruka(_ne_radi(r), lang).client)}</td>"
+        f'<td><button data-draft="{_e(email_draft(r, lang))}">{copy}</button></td></tr>'
+        for r in reports
+    )
+    return f"""
+<h2>{_e(text("unreachable", lang))}</h2>
+<p class="sub">{_e(text("unreachable_note", lang))}</p>
+<table><thead><tr><th>{_e(text("col_domain", lang))}</th><th>{_e(text("col_industry", lang))}</th>
+<th>{_e(text("col_reason", lang))}</th><th></th></tr></thead>
+<tbody>{rows}</tbody></table>
+"""
+
+
+def _not_scanned(reports: Sequence[DomainReport], excluded: int, lang: str) -> str:
+    if not reports and not excluded:
+        return ""
+    rows = "".join(
+        f"<tr><td><b>{_e(r.domain)}</b></td><td>{_e(r.industry)}</td>"
+        f"<td>{_e(razlog(r.reason, lang) if r.reason else '—')}</td></tr>"
+        for r in reports
+    )
+    table = (
+        f"<table><thead><tr><th>{_e(text('col_domain', lang))}</th><th>{_e(text('col_industry', lang))}</th>"
+        f"<th>{_e(text('col_reason', lang))}</th></tr></thead><tbody>{rows}</tbody></table>"
+        if reports
+        else ""
+    )
+    izuzeto = f'<p class="sub">{_e(text("excluded_count", lang, count=excluded))}</p>' if excluded else ""
+    return f"""
+<h2>{_e(text("not_scanned", lang))}</h2>
+<p class="sub">{_e(text("not_scanned_note", lang))}</p>
+{table}{izuzeto}
+"""
 
 
 def _details(report: DomainReport, lang: str) -> str:

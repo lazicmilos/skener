@@ -77,9 +77,9 @@ POZITIVNI = {
     ),
     "perf.html.size": lambda s: setattr(s.home, "html_bytes", 600 * 1024),
     "infra.tls.invalid": lambda s: setattr(s.entry, "tls", Tls(valid=False, error="certificate has expired")),
-    "infra.dns.unresolved": lambda s: (
-        setattr(s.entry, "error_kind", "dns"),
-        setattr(s.entry, "error_detail", "Name or service not known"),
+    "infra.unreachable": lambda s: (
+        setattr(s, "entry", Entry("https://cist.rs/", error_kind="dns_nxdomain", error_detail="NXDOMAIN")),
+        setattr(s, "entry_attempts", ["2026-09-22T09:00:00Z", "2026-09-22T09:01:05Z"]),
     ),
 }
 
@@ -126,7 +126,7 @@ UNKNOWN_SLUCAJEVI = {
     "robots": (lambda s: setattr(s.robots, "status", None), ["infra.robots.missing"]),
     "sitemap": (lambda s: setattr(s.sitemap, "status", None), ["infra.sitemap.missing"]),
     "soft404": (lambda s: setattr(s, "soft404", Soft404(probes=[])), ["infra.soft404"]),
-    "entry": (lambda s: setattr(s, "entry", None), ["infra.tls.invalid", "infra.dns.unresolved"]),
+    "entry": (lambda s: setattr(s, "entry", None), ["infra.tls.invalid", "infra.unreachable"]),
 }
 
 
@@ -146,13 +146,14 @@ def test_prazan_domen_ne_ruši_nijednu_proveru():
     """Domen koji nije ni odgovorio mora da da 20 rezultata, ne izuzetak (§8.2)."""
     site = clean_site()
     site.pages.clear()
-    site.entry = Entry(requested_url="https://cist.rs/", error_kind="dns", error_detail="NXDOMAIN")
+    site.entry = Entry(requested_url="https://cist.rs/", error_kind="dns_nxdomain", error_detail="NXDOMAIN")
+    site.entry_attempts = ["2026-09-22T09:00:00Z", "2026-09-22T09:01:05Z"]
     site.robots.status = None
     site.sitemap.status = None
     site.soft404 = Soft404(probes=[])
     results = run_level(1, site)
     assert sorted(results) == LEVEL1_IDS
-    assert results["infra.dns.unresolved"].status == "finding"
+    assert results["infra.unreachable"].status == "finding"
     assert all(r.reason for r in results.values() if r.status == "unknown")
 
 

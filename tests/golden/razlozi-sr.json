@@ -16,11 +16,6 @@
  },
  {
   "slucaj": "nivo1/prazan-snapshot",
-  "provera": "infra.dns.unresolved",
-  "razlog": "početna strana nije ni pokušana (budžet potrošen pre nje)"
- },
- {
-  "slucaj": "nivo1/prazan-snapshot",
   "provera": "infra.robots.missing",
   "razlog": "zahtev za robots.txt nije izvršen (mrežna greška ili budžet)"
  },
@@ -37,6 +32,11 @@
  {
   "slucaj": "nivo1/prazan-snapshot",
   "provera": "infra.tls.invalid",
+  "razlog": "početna strana nije ni pokušana (budžet potrošen pre nje)"
+ },
+ {
+  "slucaj": "nivo1/prazan-snapshot",
+  "provera": "infra.unreachable",
   "razlog": "početna strana nije ni pokušana (budžet potrošen pre nje)"
  },
  {
@@ -103,6 +103,11 @@
   "slucaj": "nivo1/bez-odgovora",
   "provera": "infra.tls.invalid",
   "razlog": "veza nije uspostavljena (connect_timeout), sertifikat nije proveren"
+ },
+ {
+  "slucaj": "nivo1/bez-odgovora",
+  "provera": "infra.unreachable",
+  "razlog": "početna nije vratila odgovor (connect_timeout, pokušaja: 0); iz toga se ne vidi da sajt ne radi"
  },
  {
   "slucaj": "nivo1/bez-odgovora",

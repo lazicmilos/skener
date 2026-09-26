@@ -53,12 +53,14 @@ def build_report(
     for finding in findings:
         finding.weight = weigh(finding, site.industry, config)
     findings.sort(key=lambda f: (-f.weight, f.check_id))
+    status = _status(site, findings, unknowns)
 
     return DomainReport(
         domain=site.domain,
         industry=site.industry,
         final_url=site.entry.final_url if site.entry else None,
-        status=_status(site, unknowns),
+        status=status,
+        reason=_failure(site) if status == "failed" else None,
         level2_ran=browser is not None,
         escalation_reasons=list(escalation_reasons),
         findings=findings,
@@ -69,7 +71,9 @@ def build_report(
     )
 
 
-def _status(site: SiteSnapshot, unknowns: Sequence[Unknown]) -> str:
+def _status(site: SiteSnapshot, findings: Sequence[Finding], unknowns: Sequence[Unknown]) -> str:
+    if any(f.check_id == "infra.unreachable" for f in findings):
+        return "unreachable"
     home = site.home
     if home is None or home.status != 200:
         return "failed"
@@ -78,14 +82,26 @@ def _status(site: SiteSnapshot, unknowns: Sequence[Unknown]) -> str:
     return "scanned"
 
 
+def _failure(site: SiteSnapshot) -> Reason:
+    """Zašto početna nije stigla, za listu „Nije skenirano"."""
+    entry = site.entry
+    if entry is None:
+        return Reason("entry_missing")
+    if entry.status is not None:
+        return Reason("entry_status", {"status": entry.status})
+    return Reason("entry_error", {"vrsta": entry.error_kind, "detalj": entry.error_detail or ""})
+
+
 def rank(reports: Iterable[DomainReport]) -> list[DomainReport]:
     """§9.4: sajt sa jednom katastrofom je bolji lead od sajta sa deset sitnica.
 
     Primarni ključ je najteži pojedinačni nalaz; zbir samo razrešava izjednačenje.
     Rangiranje po zbiru bi Ariju stavilo iznad Mense, a Mensa ima najskuplji SEO
-    problem koji postoji.
+    problem koji postoji. Rangiraju se samo sajtovi koji rade (Z-20): onaj koji se ne
+    otvara ide u „Ne rade", a onaj koji alat nije pregledao u „Nije skenirano".
     """
-    ordered = sorted(reports, key=lambda r: (-r.max_finding_weight, -r.total_score, r.domain))
+    rade = (r for r in reports if r.status in ("scanned", "partial"))
+    ordered = sorted(rade, key=lambda r: (-r.max_finding_weight, -r.total_score, r.domain))
     for position, report in enumerate(ordered, start=1):
         report.rank = position
     return ordered

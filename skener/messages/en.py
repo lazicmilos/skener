@@ -21,8 +21,12 @@ DECIMAL = decimal
 
 CODES: dict[str, dict[object, str]] = {
     "kodiranje": {None: "none"},
-    "vrsta": {None: "unknown"},
+    "vrsta": {None: "unknown", "dns_temporary": "DNS temporarily unavailable", "blocked": "SSRF protection"},
     "uzorak": {"sitemap": "sitemap", "links": "internal links from the home page", "none": "home page only"},
+    "razlog": {
+        "dns": "the domain has no record that connects it to a server",
+        "no_response": "the server accepted a connection over neither https nor http",
+    },
 }
 
 _WEIGHT = (
@@ -247,12 +251,12 @@ FINDINGS: dict[str, dict] = {
         ),
         "tech": "TLS error: {greska}",
     },
-    "infra.dns.unresolved": {
+    "infra.unreachable": {
         "client": (
-            "The domain does not open at all — there is no record linking it to a server. "
-            "For visitors and for Google, the site currently does not exist."
+            "The site did not open in any of the {broj_pokusaja:n:attempt|attempts} ({prvi_pokusaj:utc} and "
+            "{drugi_pokusaj:utc} UTC): {razlog}."
         ),
-        "tech": "DNS does not resolve: {detalj}",
+        "tech": "attempts {prvi_pokusaj} and {drugi_pokusaj}, last error: {detalj}",
     },
     # ------------------------------------------------------------------ a11y
     "a11y.img.alt.missing": {
@@ -275,6 +279,7 @@ TEXT: dict[str, str] = {
     "card_scanned": "Scanned",
     "card_partial": "Partial",
     "card_failed": "Failed",
+    "card_unreachable": "Not working",
     "card_level2": "On level 2",
     "card_excluded": "Excluded on request",
     "card_duration": "Duration",
@@ -293,6 +298,17 @@ TEXT: dict[str, str] = {
     "yes": "yes",
     "no": "no",
     "by_domain": "By domain",
+    "unreachable": "Not working",
+    "unreachable_note": (
+        "Sites that did not open on the second attempt either. They are not ranked, and their email\n"
+        "draft is a separate one."
+    ),
+    "not_scanned": "Not scanned",
+    "not_scanned_note": (
+        "Sites the tool did not review. They may work, so they are neither ranked nor “Not working”."
+    ),
+    "excluded_count": "Excluded at the administrator's request: {count}",
+    "col_reason": "Reason",
     "assumption_html": (
         "<b>Assumption for the loading time estimate:</b> effective speed\n"
         "{speed} Mb/s ({mb_per_s} MB/s, a slow 4G connection) plus {overhead} s of overhead\n"
@@ -314,6 +330,10 @@ TEXT: dict[str, str] = {
     "draft_opening": "Hello,\n\nI reviewed the site {domain} and noticed the following:\n\n",
     "draft_closing": (
         "\n\nIf you are interested, I can send a detailed review with a suggestion of what to fix first.\n"
+    ),
+    "draft_unreachable": (
+        "Hello,\n\nI am writing about the site {domain}. {recenica}\n\n"
+        "If you need help with the site, I would be glad to help.\n"
     ),
     "severity_critical": "CRITICAL",
     "severity_high": "HIGH",
@@ -356,6 +376,14 @@ REASONS: dict[str, str] = {
     "h1_timeout": "the page did not finish loading, the h1 may arrive later",
     "images_timeout": "the page did not finish loading, the images were not counted",
     "text_too_short": "too little text in the raw HTML ({duzina} < {prag} characters)",
+    "unreachable_unsure": (
+        "the home page returned no response ({vrsta}, attempts: {pokusaja}); that does not show that the "
+        "site is down"
+    ),
+    # why a domain was not scanned (the „Not scanned" list)
+    "entry_missing": "the snapshot has no home page (fetching crashed, see the log)",
+    "entry_status": "the home page returned status {status}",
+    "entry_error": "{vrsta}: {detalj}",
     # escalation to level 2
     "raw_text_short": "the raw HTML has {znakova} characters of text (< {prag})",
     "no_h1_raw": "the raw HTML has no h1 — the content is probably drawn by JavaScript",

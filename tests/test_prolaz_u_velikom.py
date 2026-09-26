@@ -54,9 +54,10 @@ def test_u2_koliko_udje_toliko_izadje(veliki_prolaz):
     assert len(snapshots) == len(targets)
     assert [s.domain for s in snapshots] == [t.domain for t in targets], "redosled se ne sme pomešati"
 
-    reports = rank([analyze(s, config) for s in snapshots])
+    reports = [analyze(s, config) for s in snapshots]
     assert len(reports) == len(targets)
-    assert [r.rank for r in reports] == list(range(1, len(targets) + 1))
+    # Rangiraju se samo sajtovi koji rade (Z-20); pokvareni su `failed`, ali nisu izgubljeni.
+    assert [r.rank for r in rank(reports)] == list(range(1, BROJ_SAJTOVA + 1))
 
 
 def test_pokvareni_domeni_su_failed_a_ne_izuzetak(veliki_prolaz):
@@ -81,8 +82,8 @@ def test_pokvareni_domeni_su_failed_a_ne_izuzetak(veliki_prolaz):
         po_id = {r.check_id: r for r in results}
         assert po_id["infra.tls.invalid"].status == "unknown"
         assert po_id["perf.redirect.chain"].status == "unknown"
-        # DNS jeste razrešen — veza je odbijena, što je drugačiji kvar.
-        assert po_id["infra.dns.unresolved"].status == "ok"
+        # Jedan pokušaj bez odgovora ne dokazuje da sajt ne radi (Z-20).
+        assert po_id["infra.unreachable"].status == "unknown"
 
 
 def test_ispravni_domeni_prolaze_uprkos_pokvarenim(veliki_prolaz):

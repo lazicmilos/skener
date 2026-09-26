@@ -357,13 +357,6 @@
   "tech": "https://cist.rs/: <html> bez lang atributa"
  },
  {
-  "slucaj": "nivo1/infra.dns.unresolved",
-  "check_id": "infra.dns.unresolved",
-  "severity": "critical",
-  "client": "Domen se uopšte ne otvara — ne postoji zapis koji ga povezuje sa serverom. Za posetioca i za Google sajt trenutno ne postoji.",
-  "tech": "DNS ne razrešava: Name or service not known"
- },
- {
   "slucaj": "nivo1/infra.robots.missing",
   "check_id": "infra.robots.missing",
   "severity": "low",
@@ -390,6 +383,13 @@
   "severity": "high",
   "client": "Sertifikat sajta nije valjan, pa pretraživač posetiocima prikazuje crveno upozorenje pre nego što uđu na sajt. Većina se na toj strani vrati nazad.",
   "tech": "TLS greška: certificate has expired"
+ },
+ {
+  "slucaj": "nivo1/infra.unreachable",
+  "check_id": "infra.unreachable",
+  "severity": "critical",
+  "client": "Sajt se nije otvorio ni u jednom od 2 pokušaja (2026-09-22 09:00 i 2026-09-22 09:01 UTC): domen nema zapis koji ga povezuje sa serverom.",
+  "tech": "pokušaji 2026-09-22T09:00:00Z i 2026-09-22T09:01:05Z, poslednja greška: NXDOMAIN"
  },
  {
   "slucaj": "nivo1/perf.compression.missing",

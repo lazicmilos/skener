@@ -380,26 +380,29 @@ def test_nalaz_ozbiljnosti_low_nije_razlog_za_eskalaciju():
 
 
 # --------------------------------------------------------------------------- #
-# Status domena — tabela odlučivanja (početna, unknown, budžet)
+# Status domena — tabela odlučivanja (ne radi, početna, unknown, budžet)
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
-    "pocetna, unknown, budzet, ocekivano",
+    "ne_radi, pocetna, unknown, budzet, ocekivano",
     [
-        pytest.param(False, False, False, "failed", id="tab-nema-pocetne"),
-        pytest.param(False, True, True, "failed", id="tab-nema-pocetne-sve-ostalo"),
-        pytest.param(True, False, False, "scanned", id="tab-sve-u-redu"),
-        pytest.param(True, True, False, "partial", id="tab-unknown"),
-        pytest.param(True, False, True, "partial", id="tab-budzet"),
-        pytest.param(True, True, True, "partial", id="tab-unknown-i-budzet"),
+        pytest.param(False, False, False, False, "failed", id="tab-nema-pocetne"),
+        pytest.param(False, False, True, True, "failed", id="tab-nema-pocetne-sve-ostalo"),
+        pytest.param(False, True, False, False, "scanned", id="tab-sve-u-redu"),
+        pytest.param(False, True, True, False, "partial", id="tab-unknown"),
+        pytest.param(False, True, False, True, "partial", id="tab-budzet"),
+        pytest.param(False, True, True, True, "partial", id="tab-unknown-i-budzet"),
+        pytest.param(True, False, False, False, "unreachable", id="tab-ne-radi"),
+        pytest.param(True, False, True, True, "unreachable", id="tab-ne-radi-sve-ostalo"),
     ],
 )
-def test_status_domena_tabela(pocetna, unknown, budzet, ocekivano):
+def test_status_domena_tabela(ne_radi, pocetna, unknown, budzet, ocekivano):
     site = clean_site()
     if not pocetna:
         site.pages.clear()
     site.budget.exhausted = budzet
+    nalazi = [Finding("cist.rs", "infra.unreachable", 1, "infra", "critical")] if ne_radi else []
     nepoznati = [Unknown(check_id="seo.title.duplicate", reason=Reason("requires.pages"))] if unknown else []
-    assert _status(site, nepoznati) == ocekivano
+    assert _status(site, nalazi, nepoznati) == ocekivano
 
 
 # --------------------------------------------------------------------------- #

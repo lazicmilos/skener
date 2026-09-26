@@ -119,7 +119,8 @@ def oko_load():
     """Z-24: zahtev pre `load` čije telo stiže posle njega, i zahtev koji počne tek posle `load`."""
     extra = {
         "/": Response(SAOBRACAJ_OKO_LOAD),
-        "/sporo.bin": Response(b"s" * 150_000, delay=0.8),
+        # 2 s, a ne manje: pod opterećenjem i prazna stranica ume da stigne do `load` tek posle 0,8 s.
+        "/sporo.bin": Response(b"s" * 150_000, delay=2.0),
         "/posle.bin": Response(b"p" * 200_000),
     }
     with FakeSite(extra=extra) as site:
@@ -134,7 +135,7 @@ def test_zahtev_posle_load_ne_ulazi_u_tezinu(oko_load):
 
 
 def test_telo_koje_stigne_posle_load_za_zahtev_pre_load_se_broji(oko_load):
-    assert oko_load.timing.load_ms < 800, "telo sporo.bin mora da stigne posle `load`"
+    assert oko_load.timing.load_ms < 2000, "telo sporo.bin mora da stigne posle `load`"
     assert oko_load.network.bytes_at_load >= 150_000
 
 

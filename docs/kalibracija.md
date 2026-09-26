@@ -39,6 +39,19 @@ prolaza sa `--level 2`.
 - **Odluka:** kod za Z-24 ostaje. Merenje se ponavlja posle Z-30, pod fiksnim mrežnim profilom, i
   tada se rok nivoa 2 posmatra zajedno sa Z-50.
 
+### Zahtev tik pre `load` ume da se broji posle njega
+
+- **Zapažanje:** test za Z-24 pao je u CI-ju (`cda6b0f`). `fetch` koji skripta pošalje pre `load`
+  brojao se kao da je krenuo posle njega. Lokalno, pod opterećenjem procesora, to se desilo 3 puta u
+  15 ponavljanja.
+- **Uzrok:** nivo 2 presreće svaki zahtev (SSRF zaštita), a Playwright tada javlja zahtev tek kad
+  stigne do mrežnog sloja, a ne kad ga stranica pošalje. Zahtev koji ne zadržava `load` (`fetch`
+  ili XHR) i koji krene u poslednjim milisekundama pre `load` zato ponekad
+  bude viđen posle `load`. Isto važi i za prave sajtove, ne samo za test.
+- **Odluka:** za sada se ne popravlja. Greška pomera težinu i broj zahteva naniže, pa ne pravi lažne
+  nalaze. Ne zna se da li je ona uzrok odstupanja od 13 % i 17 % iz prvog merenja. Ako merenje
+  posle Z-30 opet pokaže odstupanje tik uz `load`, ovo je prvi kandidat.
+
 ## 2026-09-26 — `seo.canonical.duplicate` broji samo tuđi canonical (Z-23)
 
 - **Zapažanje:** u IT-SKENER-002 (O-9) dve podstranice od sedam, koje upućuju na početnu, dale su

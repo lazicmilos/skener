@@ -123,6 +123,51 @@ def test_ulaz_sa_ip_adresom_ne_salje_nijedan_zahtev():
 
 
 # --------------------------------------------------------------------------- #
+# Nivo 2: log kaže zašto je zahtev odbijen. Chromium za oba slučaja javlja isto,
+# ERR_BLOCKED_BY_CLIENT, a neuspeo DNS nije privatna adresa.
+# --------------------------------------------------------------------------- #
+class LaznaRuta:
+    def __init__(self, url: str) -> None:
+        self.request = type("Zahtev", (), {"url": url})()
+        self.ishod: str | None = None
+
+    async def continue_(self) -> None:
+        self.ishod = "continue"
+
+    async def abort(self, kod: str) -> None:
+        self.ishod = kod
+
+
+@pytest.mark.parametrize(
+    "razresi, razlog",
+    [
+        pytest.param(socket.gaierror(socket.EAI_AGAIN, "privremeno"), "DNS nije razrešio ime", id="ke-dns"),
+        pytest.param(
+            [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))],
+            "adresa nije javna: 10.0.0.5",
+            id="ke-privatna",
+        ),
+    ],
+)
+def test_nivo_2_upisuje_zasto_odbija_zahtev(monkeypatch, caplog, razresi, razlog):
+    from skener.fetch.browser import _cuvar
+
+    def lazni_dns(*_args, **_kwargs):
+        if isinstance(razresi, Exception):
+            raise razresi
+        return razresi
+
+    monkeypatch.setattr(socket, "getaddrinfo", lazni_dns)
+    ruta = LaznaRuta("https://primer.rs/")
+    caplog.set_level("INFO", logger="skener")
+    asyncio.run(_cuvar(frozenset(), RuntimeError, "primer.rs")(ruta))
+    assert ruta.ishod == "blockedbyclient"
+    [zapis] = [r for r in caplog.records if "odbija" in r.getMessage()]
+    assert razlog in zapis.getMessage() and "primer.rs:443" in zapis.getMessage()
+    assert zapis.domain == "primer.rs"
+
+
+# --------------------------------------------------------------------------- #
 # Nivo 2: `route` proverava svaki zahtev browsera
 # --------------------------------------------------------------------------- #
 def _nivo2(site: FakeSite):

@@ -276,7 +276,7 @@ async def capture(
         service_workers="block",
     )
     try:
-        await context.route("**/*", _cuvar(addresses.allowlist(config), PlaywrightError))
+        await context.route("**/*", _cuvar(addresses.allowlist(config), PlaywrightError, site.domain))
         page = await context.new_page()
         page.on("request", recorder.on_request)
         page.on("load", recorder.on_load)
@@ -438,14 +438,17 @@ def _tiho_za_zatvoren_kontekst(prethodni: Callable | None) -> Callable:
     return handler
 
 
-def _cuvar(allowed: addresses.Allowlist, error_type: type) -> Any:
+def _cuvar(allowed: addresses.Allowlist, error_type: type, domain: str) -> Any:
     """Svaki zahtev browsera prolazi istu proveru adrese kao nivo 1 (ADR-006).
 
     Chromium sam razrešava ime, pa između ove provere i njegove veze postoji prozor, a
     WebSocket i preusmerenja `route` ne vidi. Zato produkcija dodaje i filter izlaznog
     saobraćaja na nivou mreže; ovo je prva linija, ne jedina.
+
+    Za odbijen zahtev Chromium javlja samo `ERR_BLOCKED_BY_CLIENT`, i kad je adresa privatna i kad
+    DNS nije odgovorio. Zato razlog ide u log, jednom po hostu.
     """
-    presude: dict[tuple[str, int], bool] = {}
+    presude: dict[tuple[str, int], str | None] = {}
 
     async def handler(route: Any) -> None:
         parts = urlsplit(route.request.url)
@@ -454,8 +457,11 @@ def _cuvar(allowed: addresses.Allowlist, error_type: type) -> Any:
             port = parts.port or (443 if parts.scheme == "https" else 80)
             kljuc = (parts.hostname, port)
             if kljuc not in presude:
-                presude[kljuc] = await _sve_adrese_dozvoljene(parts.hostname, port, allowed)
-            dozvoljeno = presude[kljuc]
+                presude[kljuc] = await _zasto_odbiti(parts.hostname, port, allowed)
+                if presude[kljuc]:
+                    razlog = presude[kljuc]
+                    log.info("nivo 2 odbija %s:%d: %s", *kljuc, razlog, extra={"domain": domain})
+            dozvoljeno = presude[kljuc] is None
         # Posle tvrdog limita kontekst je zatvoren, pa ni odgovor ruti nema kome da ode.
         with contextlib.suppress(error_type):
             if dozvoljeno:
@@ -466,14 +472,18 @@ def _cuvar(allowed: addresses.Allowlist, error_type: type) -> Any:
     return handler
 
 
-async def _sve_adrese_dozvoljene(host: str, port: int, allowed: addresses.Allowlist) -> bool:
-    """Chromium bira adresu sam, pa sme samo ako su dozvoljene sve. Neuspeo DNS = ne."""
+async def _zasto_odbiti(host: str, port: int, allowed: addresses.Allowlist) -> str | None:
+    """Razlog da zahtev ne ide, ili `None`. Chromium bira adresu sam, pa sme samo ako su dozvoljene
+    sve, a neuspeo DNS je odbijanje: ne zna se kuda bi veza otišla."""
     try:
         infos = await asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    except OSError:
-        return False
-    ips = {info[4][0] for info in infos}
-    return bool(ips) and all(addresses.may_connect(ip, host, port, allowed) for ip in ips)
+    except OSError as exc:
+        return f"DNS nije razrešio ime ({exc})"
+    ips = sorted({info[4][0] for info in infos})
+    zabranjene = [ip for ip in ips if not addresses.may_connect(ip, host, port, allowed)]
+    if not ips or zabranjene:
+        return f"adresa nije javna: {', '.join(zabranjene) or '—'}"
+    return None
 
 
 def _launch_options(config: dict) -> dict[str, Any]:

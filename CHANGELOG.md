@@ -64,6 +64,10 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Ispravljeno
 
+- Kad SSRF zaštita na nivou 2 odbije zahtev, Chromium javlja samo `ERR_BLOCKED_BY_CLIENT`, pa se
+  neuspeo DNS upit nije razlikovao od privatne adrese. Sada log (INFO, jednom po hostu) kaže
+  razlog: „DNS nije razrešio ime" ili „adresa nije javna: …".
+
 - Težina i broj zahteva brojali su i ono što stigne posle događaja `load` (analitika, chat, lenje
   slike), pa je isti sajt jednom imao 179, a drugi put 281 zahtev. Sada se broje samo zahtevi
   započeti pre `load`; telo koje stigne kasnije za takav zahtev se broji. Ukupno je samo u

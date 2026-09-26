@@ -13,6 +13,32 @@ Kako se provera radi, piše u [`provera-na-pravim-sajtovima.md`](provera-na-prav
   su kalibrisani na ukupnim vrednostima; nova raspodela se meri u Z-50. Prihvatanje: deset sajtova
   sa liste A, po dva merenja, razlika ≤ 10 % kod bar 9 od 10.
 
+### Prihvatanje, prvo merenje (dva para, bez mrežnog profila)
+
+Deset sajtova sa liste A, raspoređenih po težini od 0,6 do 22 MB, izmereno je u dva para, po dva
+prolaza sa `--level 2`.
+
+| Par | Stiglo do `load` u oba prolaza | Razlika ≤ 10 % | Ne poredi se |
+|---|---|---|---|
+| 1 | 7 od 10 | 6 od 7 | 3: rok od 25 s istekao (jedan sajt u oba prolaza, dva samo u drugom) |
+| 2 | 6 od 10 | 5 od 6 | 4: rok istekao (2), nivo 2 pao na DNS-u (2) |
+
+- **Zapažanje:** kod sajtova koji su u oba prolaza stigli do `load`, težina i broj zahteva do
+  `load` razlikuju se ≤ 1 %, osim jednog sajta. Ukupan broj zahteva istog sajta menjao se sa 107 na
+  86, a do `load` je u sva četiri prolaza bio 8. Taj jedan sajt je odstupao 13 % i 17 %, i to
+  sistematski: prvi prolaz u paru imao je 124 zahteva i 2,11 MB slika do `load`, drugi 125–126
+  zahteva i 2,65 MB, a ukupno slika bilo je svaki put oko 2,7 MB. Vreme do `load` istog sajta
+  menjalo se i četvorostruko (4,8 s pa 17,9 s), a rok je ističao i sajtovima koji su u drugom
+  prolazu stigli do `load` za 7 s.
+- **Uzrok:** prvi prolaz u paru dolazio je posle desetak minuta pauze, a drugi dva-tri minuta
+  kasnije. Najverovatnije server ili CDN sajta brže odgovara kad je „zagrejan", pa jedna slika od
+  oko 540 kB krene pre `load`. To je ponašanje sajta tik uz granicu `load`, a ne šum koji pravilo
+  može da ukloni. Sajtovi koji se ne porede otpali su zbog brzine veze u trenutku merenja i zbog
+  neuspelog DNS upita. SSRF zaštita nivoa 2 tada blokira zahtev, pa Chromium javlja
+  `ERR_BLOCKED_BY_CLIENT`, iako adresa nije privatna.
+- **Odluka:** kod za Z-24 ostaje. Merenje se ponavlja posle Z-30, pod fiksnim mrežnim profilom, i
+  tada se rok nivoa 2 posmatra zajedno sa Z-50.
+
 ## 2026-09-26 — `seo.canonical.duplicate` broji samo tuđi canonical (Z-23)
 
 - **Zapažanje:** u IT-SKENER-002 (O-9) dve podstranice od sedam, koje upućuju na početnu, dale su

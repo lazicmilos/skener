@@ -53,7 +53,7 @@
   "check_id": "i18n.lang.invalid",
   "severity": "medium",
   "client": "Sajt je u kodu označen oznakom „zxx”, koja ne označava nijedan jezik. Za čitače ekrana je to isto kao da oznake nema.",
-  "tech": "https://ariaclubzlatibor.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod"
+  "tech": "https://ariaclubzlatibor.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod (izvor: sirovi HTML)"
  },
  {
   "slucaj": "ispitni/spec/ariaclubzlatibor.rs",
@@ -151,7 +151,7 @@
   "check_id": "i18n.lang.mismatch",
   "severity": "medium",
   "client": "Sadržaj sajta je na srpskom, ali je u kodu označen kao „en-US”. Čitači ekrana, koje koriste slepi i slabovidi posetioci, zato srpski tekst izgovaraju po pravilima tog jezika, pa je teško razumljiv.",
-  "tech": "https://ordinacijadenta.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0197, 918 znakova)"
+  "tech": "https://ordinacijadenta.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0197, 918 znakova; izvor: sirovi HTML)"
  },
  {
   "slucaj": "ispitni/spec/protetica.com",
@@ -228,7 +228,7 @@
   "check_id": "i18n.lang.invalid",
   "severity": "medium",
   "client": "Sajt je u kodu označen oznakom „zxx”, koja ne označava nijedan jezik. Za čitače ekrana je to isto kao da oznake nema.",
-  "tech": "https://ariaclubzlatibor.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod"
+  "tech": "https://ariaclubzlatibor.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod (izvor: sirovi HTML)"
  },
  {
   "slucaj": "ispitni/toml/ariaclubzlatibor.rs",
@@ -312,7 +312,7 @@
   "check_id": "i18n.lang.mismatch",
   "severity": "medium",
   "client": "Sadržaj sajta je na srpskom, ali je u kodu označen kao „en-US”. Čitači ekrana, koje koriste slepi i slabovidi posetioci, zato srpski tekst izgovaraju po pravilima tog jezika, pa je teško razumljiv.",
-  "tech": "https://ordinacijadenta.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0197, 918 znakova)"
+  "tech": "https://ordinacijadenta.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0197, 918 znakova; izvor: sirovi HTML)"
  },
  {
   "slucaj": "ispitni/toml/protetica.com",
@@ -340,21 +340,21 @@
   "check_id": "i18n.lang.invalid",
   "severity": "medium",
   "client": "Sajt je u kodu označen oznakom „zxx”, koja ne označava nijedan jezik. Za čitače ekrana je to isto kao da oznake nema.",
-  "tech": "https://cist.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod"
+  "tech": "https://cist.rs/: lang=\"zxx\" nije upotrebljiv BCP-47 kod (izvor: sirovi HTML)"
  },
  {
   "slucaj": "nivo1/i18n.lang.mismatch",
   "check_id": "i18n.lang.mismatch",
   "severity": "medium",
   "client": "Sadržaj sajta je na srpskom, ali je u kodu označen kao „en-US”. Čitači ekrana, koje koriste slepi i slabovidi posetioci, zato srpski tekst izgovaraju po pravilima tog jezika, pa je teško razumljiv.",
-  "tech": "https://cist.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0269, 1604 znakova)"
+  "tech": "https://cist.rs/: lang=\"en-US\", sadržaj prepoznat kao sr (ćirilica 0.0, dijakritici 0.0269, 1604 znakova; izvor: sirovi HTML)"
  },
  {
   "slucaj": "nivo1/i18n.lang.missing",
   "check_id": "i18n.lang.missing",
   "severity": "medium",
   "client": "U kodu sajta nigde ne piše na kom je jeziku. Čitači ekrana, koje koriste slepi i slabovidi posetioci, zato ne znaju kojim izgovorom da ga čitaju.",
-  "tech": "https://cist.rs/: <html> bez lang atributa"
+  "tech": "https://cist.rs/: <html> bez lang atributa (izvor: sirovi HTML)"
  },
  {
   "slucaj": "nivo1/infra.robots.missing",

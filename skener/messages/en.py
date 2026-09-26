@@ -23,6 +23,7 @@ CODES: dict[str, dict[object, str]] = {
     "kodiranje": {None: "none"},
     "vrsta": {None: "unknown", "dns_temporary": "DNS temporarily unavailable", "blocked": "SSRF protection"},
     "uzorak": {"sitemap": "sitemap", "links": "internal links from the home page", "none": "home page only"},
+    "izvor": {"sirovi_html": "raw HTML", "nivo2": "the page after JavaScript"},
     "razlog": {
         "dns": "the domain has no record that connects it to a server",
         "no_response": "the server accepted a connection over neither https nor http",
@@ -200,14 +201,14 @@ FINDINGS: dict[str, dict] = {
             "used by blind and visually impaired visitors, therefore do not know which pronunciation "
             "to read it with."
         ),
-        "tech": "{stranica}: <html> without a lang attribute",
+        "tech": "{stranica}: <html> without a lang attribute (source: {izvor})",
     },
     "i18n.lang.invalid": {
         "client": (
             "The site is marked in its code with “{lang}”, which does not denote any language. "
             "For screen readers that is the same as having no language tag at all."
         ),
-        "tech": '{stranica}: lang="{lang}" is not a usable BCP-47 code',
+        "tech": '{stranica}: lang="{lang}" is not a usable BCP-47 code (source: {izvor})',
     },
     "i18n.lang.mismatch": {
         "client": (
@@ -217,7 +218,8 @@ FINDINGS: dict[str, dict] = {
         ),
         "tech": (
             '{stranica}: lang="{lang}", content detected as {prepoznat_jezik} '
-            "(Cyrillic {cirilica_udeo}, diacritics {dijakritici_udeo}, {duzina_teksta} characters)"
+            "(Cyrillic {cirilica_udeo}, diacritics {dijakritici_udeo}, {duzina_teksta} characters; "
+            "source: {izvor})"
         ),
     },
     # ----------------------------------------------------------------- infra
@@ -382,6 +384,9 @@ REASONS: dict[str, str] = {
     "h1_timeout": "the page did not finish loading, the h1 may arrive later",
     "images_timeout": "the page did not finish loading, the images were not counted",
     "text_too_short": "too little text in the raw HTML ({duzina} < {prag} characters)",
+    "text_too_short_rendered": (
+        "too little text even on the page after JavaScript ({duzina} < {prag} characters)"
+    ),
     "unreachable_unsure": (
         "the home page returned no response ({vrsta}, attempts: {pokusaja}); that does not show that the "
         "site is down"

@@ -139,6 +139,22 @@ def test_telo_koje_stigne_posle_load_za_zahtev_pre_load_se_broji(oko_load):
     assert oko_load.network.bytes_at_load >= 150_000
 
 
+def test_browser_belezi_tekst_i_lang_posle_javascript_a():
+    """Z-25: sirovi HTML nema ni `lang` ni tekst; oba postavlja JavaScript."""
+    strana = (
+        "<!doctype html><html><body><script>"
+        "document.documentElement.lang = 'sr';"
+        "document.body.insertAdjacentHTML("
+        "'beforeend', '<p>Dobrodošli   u   ordinaciju. Zakažite pregled.</p>');"
+        "</script></body></html>"
+    ).encode()
+    with FakeSite(extra={"/": Response(strana)}) as site:
+        snimljeno = snimi(site)
+    assert snimljeno.dom.lang == "sr"
+    assert snimljeno.dom.text_sample == "Dobrodošli u ordinaciju. Zakažite pregled."
+    assert snimljeno.dom.text_length == len(snimljeno.dom.text_sample)
+
+
 def test_browser_belezi_interne_veze_iz_renderovanog_doma():
     """Z-21: vezu koju crta JavaScript vidi samo nivo 2; spoljna veza nije interna."""
     strana = (

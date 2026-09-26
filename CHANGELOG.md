@@ -64,6 +64,12 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Ispravljeno
 
+- Jezičke provere (`i18n.lang.missing`, `invalid`, `mismatch`) gledale su samo sirovi HTML, pa je
+  sajt čiji tekst crta JavaScript imao `unknown`, a `lang` koji postavi JavaScript bio je prijavljen
+  kao nepostojeći. Kad je nivo 2 radio, provere sada gledaju stranicu posle JavaScript-a, onakvu
+  kakvu čita čitač ekrana, a dokaz kaže izvor (`sirovi_html` ili `nivo2`). Snimak nivoa 2 beleži
+  `lang` i vidljiv tekst posle JavaScript-a.
+
 - Kad SSRF zaštita na nivou 2 odbije zahtev, Chromium javlja samo `ERR_BLOCKED_BY_CLIENT`, pa se
   neuspeo DNS upit nije razlikovao od privatne adrese. Sada log (INFO, jednom po hostu) kaže
   razlog: „DNS nije razrešio ime" ili „adresa nije javna: …".

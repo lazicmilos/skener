@@ -24,7 +24,8 @@ from urllib.parse import urlsplit
 
 from skener import __version__, addresses, store
 from skener.config import get, user_agent
-from skener.fetch.page import LINKS_KEPT, internal
+from skener.fetch.page import LINKS_KEPT, TEXT_SAMPLE_CHARS, internal
+from skener.fetch.urls import collapse_ws
 from skener.models import (
     BrowserSnapshot,
     ConsoleStats,
@@ -81,6 +82,8 @@ _DOM = """
     total: images.length,
     withoutAlt, emptyAlt, unmeasured, oversized,
     links: Array.from(document.links, (a) => a.href),
+    lang: document.documentElement.getAttribute('lang'),
+    text: document.body ? document.body.innerText : '',
   };
 }
 """
@@ -381,8 +384,9 @@ async def _read_dom(
         for item in raw["oversized"]
     ]
     oversized.sort(key=lambda image: -image.est_waste_kb)
-    # Veze koje crta JavaScript vidi samo nivo 2 (Z-21).
+    # Veze i tekst koje crta JavaScript vidi samo nivo 2 (Z-21, Z-25).
     links = internal(raw["links"], snapshot.url)
+    text = collapse_ws(raw["text"]) or ""
     return DomStats(
         h1_count=raw["h1"],
         images_total=raw["total"],
@@ -392,6 +396,9 @@ async def _read_dom(
         images_unmeasured=raw["unmeasured"],
         internal_links=links[:LINKS_KEPT],
         internal_links_total=len(links),
+        lang=raw["lang"],
+        text_sample=text[:TEXT_SAMPLE_CHARS],
+        text_length=len(text),
     )
 
 

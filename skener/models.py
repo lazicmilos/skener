@@ -284,6 +284,11 @@ class DomStats:
     # Interne veze iz renderovanog DOM-a (do 200) i koliko ih ima; `None` = nisu beležene (1.x).
     internal_links: list[str] = field(default_factory=list)
     internal_links_total: int | None = None
+    # Stranica kakvu čita čitač ekrana (Z-25): `lang` i vidljiv tekst posle JS-a, do 4000 znakova.
+    # `text_length` je `None` kad nisu beleženi (1.x).
+    lang: str | None = None
+    text_sample: str = ""
+    text_length: int | None = None
 
 
 @dataclass

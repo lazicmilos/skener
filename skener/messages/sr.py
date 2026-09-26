@@ -40,6 +40,7 @@ CODES: dict[str, dict[object, str]] = {
         "blocked": "zaštita od SSRF-a",
     },
     "uzorak": {"sitemap": "sitemap", "links": "interni linkovi sa početne", "none": "samo početna"},
+    "izvor": {"sirovi_html": "sirovi HTML", "nivo2": "stranica posle JavaScript-a"},
     "razlog": {
         "dns": "domen nema zapis koji ga povezuje sa serverom",
         "no_response": "server nije prihvatio vezu ni preko https ni preko http",
@@ -214,14 +215,14 @@ FINDINGS: dict[str, dict] = {
             "U kodu sajta nigde ne piše na kom je jeziku. Čitači ekrana, koje koriste slepi i "
             "slabovidi posetioci, zato ne znaju kojim izgovorom da ga čitaju."
         ),
-        "tech": "{stranica}: <html> bez lang atributa",
+        "tech": "{stranica}: <html> bez lang atributa (izvor: {izvor})",
     },
     "i18n.lang.invalid": {
         "client": (
             "Sajt je u kodu označen oznakom „{lang}”, koja ne označava nijedan jezik. "
             "Za čitače ekrana je to isto kao da oznake nema."
         ),
-        "tech": '{stranica}: lang="{lang}" nije upotrebljiv BCP-47 kod',
+        "tech": '{stranica}: lang="{lang}" nije upotrebljiv BCP-47 kod (izvor: {izvor})',
     },
     "i18n.lang.mismatch": {
         "client": (
@@ -231,7 +232,8 @@ FINDINGS: dict[str, dict] = {
         ),
         "tech": (
             '{stranica}: lang="{lang}", sadržaj prepoznat kao {prepoznat_jezik} '
-            "(ćirilica {cirilica_udeo}, dijakritici {dijakritici_udeo}, {duzina_teksta} znakova)"
+            "(ćirilica {cirilica_udeo}, dijakritici {dijakritici_udeo}, {duzina_teksta} znakova; "
+            "izvor: {izvor})"
         ),
     },
     # ----------------------------------------------------------------- infra
@@ -395,6 +397,7 @@ REASONS: dict[str, str] = {
     "h1_timeout": "stranica nije dovršila učitavanje, h1 može da stigne kasnije",
     "images_timeout": "stranica nije dovršila učitavanje, slike nisu prebrojane",
     "text_too_short": "premalo teksta u sirovom HTML-u ({duzina} < {prag} znakova)",
+    "text_too_short_rendered": "premalo teksta i na stranici posle JavaScript-a ({duzina} < {prag} znakova)",
     "unreachable_unsure": (
         "početna nije vratila odgovor ({vrsta}, pokušaja: {pokusaja}); iz toga se ne vidi da sajt ne radi"
     ),

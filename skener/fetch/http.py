@@ -49,8 +49,14 @@ log = logging.getLogger("skener.fetch")
 ODUSTANI_STATUSI = {429, 503}
 PROBE_SUFFIXES = ("", ".html")
 # DNS greška je greška imena, pa ni http na istom imenu ne pomaže.
-DNS = frozenset({"dns", "dns_nxdomain", "dns_temporary"})
-DNS_ERRNO = {socket.EAI_NONAME: "dns_nxdomain", socket.EAI_AGAIN: "dns_temporary"}
+DNS = frozenset({"dns", "dns_nxdomain", "dns_nodata", "dns_temporary"})
+# `dns_nodata`: ime postoji, ali nema adresu. Na Windows-u je EAI_NODATA isto što i EAI_NONAME,
+# pa ide prvi i tamo ga NONAME prepiše; oba znače da sajt ne radi.
+DNS_ERRNO = {
+    socket.EAI_NODATA: "dns_nodata",
+    socket.EAI_NONAME: "dns_nxdomain",
+    socket.EAI_AGAIN: "dns_temporary",
+}
 
 
 @dataclass

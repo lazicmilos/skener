@@ -34,6 +34,7 @@ from skener.score import analyze
 DOMEN = "ne-rade.test"
 ISHODI = {
     "nxdomain": ("dns_nxdomain", "[Errno -2] Name or service not known"),
+    "bez_adrese": ("dns_nodata", "[Errno -5] No address associated with hostname"),
     "dns_privremeno": ("dns_temporary", "[Errno -3] Temporary failure in name resolution"),
     "bez_veze": ("no_connection", "[Errno 111] Connection refused"),
     "rukovanje": ("tls_handshake", "[SSL: UNEXPECTED_EOF_WHILE_READING]"),
@@ -89,6 +90,7 @@ def _oba(sema: str, ishod) -> dict:
     "tabela, status, razlog, pokusaja",
     [
         pytest.param(_oba("https", "nxdomain"), "unreachable", "dns", 2, id="tab-ime-ne-postoji"),
+        pytest.param(_oba("https", "bez_adrese"), "unreachable", "dns", 2, id="tab-ime-bez-adrese"),
         pytest.param(
             {**_oba("https", "bez_veze"), **_oba("http", "bez_veze")},
             "unreachable", "no_response", 2, id="tab-bez-veze-na-https-i-http",
@@ -140,6 +142,12 @@ def test_drugi_pokusaj_ceka_najmanje_zadato_vreme(monkeypatch):
     "errno, vrsta",
     [
         pytest.param(socket.EAI_NONAME, "dns_nxdomain", id="ke-ime-ne-postoji"),
+        pytest.param(
+            socket.EAI_NODATA,
+            "dns_nodata",
+            id="ke-ime-bez-adrese",
+            marks=pytest.mark.skipif(socket.EAI_NODATA == socket.EAI_NONAME, reason="na Windows-u isti kod"),
+        ),
         pytest.param(socket.EAI_AGAIN, "dns_temporary", id="ke-privremeno"),
         pytest.param(socket.EAI_FAIL, "dns", id="ke-ostalo"),
     ],

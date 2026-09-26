@@ -32,8 +32,8 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
   `infra.unreachable` i status `unreachable`, i ide u listu „Ne rade" umesto u rangiranje.
   `rank()` rangira samo `scanned` i `partial`, a ostali domeni imaju `rank` 0. JSON ima liste
   `unreachable` i `not_scanned`, a izveštaj domena polje `reason` (zašto je `failed`).
-- Vrsta greške `dns` u snapshotu je podeljena na `dns_nxdomain`, `dns_temporary` i `dns` (ostale
-  DNS greške). TCP veza koja nije uspostavljena je `no_connection`.
+- Vrsta greške `dns` u snapshotu je podeljena na `dns_nxdomain`, `dns_nodata` (ime postoji, ali
+  nema adresu), `dns_temporary` i `dns` (ostale DNS greške). TCP veza koja nije uspostavljena je `no_connection`.
 
 ### Dodato
 

@@ -84,8 +84,8 @@ domena. `--format` bira koje od prva četiri se pišu; snapshoti se pišu uvek.
 
 Rangiraju se samo sajtovi koji rade. Sajt koji se ne otvori ni u drugom pokušaju, najranije 60 s
 posle prvog (`http.second_attempt_after_s`), ide u odeljak „Ne rade", sa posebnim nacrtom mejla.
-To važi samo kad je stanje sigurno: ime ne postoji u DNS-u, ili server ne prihvata vezu ni preko
-https ni preko http. Domen koji iz drugog razloga nema početnu (DNS privremeno nedostupan, prekinuto
+To važi samo kad je stanje sigurno: ime ne postoji u DNS-u ili nema adresu, ili server ne prihvata
+vezu ni preko https ni preko http. Domen koji iz drugog razloga nema početnu (DNS privremeno nedostupan, prekinuto
 TLS rukovanje, bilo kakav HTTP odgovor, adresa koja nije javna) ide u „Nije skenirano", sa razlogom,
 jer sajt možda radi, samo ga alat nije video. Tu je i broj izuzetih domena.
 
@@ -179,7 +179,7 @@ generiše ponovo; CI proverava samo da u njoj nije izostala nijedna provera iz r
 | `infra.sitemap.missing` | 1 | infra | medium | status 404 ili 410, ili 200 sa 0 URL-ova; ostali statusi → unknown |
 | `infra.soft404` | 1 | infra | high | obe sonde vraćaju konačni status 200 (§5.2); status van {200, 404, 410} → unknown |
 | `infra.tls.invalid` | 1 | infra | high | TLS provera odbila sertifikat |
-| `infra.unreachable` | 1 | infra | critical | oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME, ili TCP veza odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok |
+| `infra.unreachable` | 1 | infra | critical | oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME ili EAI_NODATA, ili TCP veza odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok |
 | `perf.compression.missing` | 1 | perf | low | content-encoding ∉ {gzip, br, zstd, deflate} i HTML > 50 kB |
 | `perf.html.size` | 1 | perf | low | html_bytes > thresholds.perf.html_size_kb (500 kB) |
 | `perf.redirect.chain` | 1 | perf | low | broj skokova ≥ thresholds.perf.redirect_hops (3) |

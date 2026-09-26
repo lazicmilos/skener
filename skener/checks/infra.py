@@ -132,12 +132,12 @@ def tls_invalid(snapshot: SiteSnapshot, ctx: Context):
     base_severity="critical",
     requires=["entry"],
     description=(
-        "Sajt se ne otvara ni u drugom pokušaju: ime ne postoji u DNS-u, ili server ne prihvata "
-        "vezu ni preko https ni preko http. Domen ide u listu „Ne rade”, a ne u rangiranje."
+        "Sajt se ne otvara ni u drugom pokušaju: ime ne postoji u DNS-u ili nema adresu, ili server "
+        "ne prihvata vezu ni preko https ni preko http. Domen ide u listu „Ne rade”, a ne u rangiranje."
     ),
     threshold=(
-        "oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME, ili TCP veza "
-        "odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok"
+        "oba pokušaja, u razmaku od bar http.second_attempt_after_s (60 s): EAI_NONAME ili EAI_NODATA, "
+        "ili TCP veza odbijena ili istekla i na https i na http; bilo kakav HTTP odgovor → ok"
     ),
 )
 def unreachable(snapshot: SiteSnapshot, ctx: Context):

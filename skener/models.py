@@ -221,14 +221,15 @@ class SiteSnapshot:
     def entry_unreachable(self) -> str | None:
         """`dns` ili `no_response` kad ovaj pokušaj ulaza pokazuje da sajt ne radi, inače `None`.
 
-        Sigurno je samo ovo: ime ne postoji u DNS-u, ili TCP veza nije uspostavljena ni na
-        https ni na http. Privremen DNS, prekinuto TLS rukovanje, bilo kakav HTTP odgovor i
-        blokada privatne adrese to nisu, jer sajt možda radi, samo ga mi nismo videli (Z-20).
+        Sigurno je samo ovo: ime ne postoji u DNS-u ili nema adresu, ili TCP veza nije
+        uspostavljena ni na https ni na http. Privremen DNS, prekinuto TLS rukovanje, bilo kakav
+        HTTP odgovor i blokada privatne adrese to nisu, jer sajt možda radi, samo ga mi nismo
+        videli (Z-20).
         """
         entry = self.entry
         if entry is None or entry.status is not None:
             return None
-        if entry.error_kind == "dns_nxdomain":
+        if entry.error_kind in ("dns_nxdomain", "dns_nodata"):
             return "dns"
         sheme = [e.kind for e in self.errors if e.stage == "entry"]
         return "no_response" if sheme == ["no_connection", "no_connection"] else None

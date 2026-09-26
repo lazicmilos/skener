@@ -78,8 +78,9 @@ FINDINGS: dict[str, dict] = {
     "perf.page.weight": {
         "client": "Početna strana prenosi {mb} MB. " + _TEZINA,
         "tech": (
-            "total_bytes={bajtova}, bez videa {mb} MB, video {video_mb} MB, zahteva={zahteva}, "
-            "nemereno={nemereno}, reached={reached}"
+            "bytes_at_load={bajtova}, bez videa {mb} MB, video {video_mb} MB, zahteva={zahteva}, "
+            "nemereno={nemereno}, reached={reached}; sa onim posle load {ukupno_bajtova} B i "
+            "{ukupno_zahteva} zahteva (informativno)"
         ),
         "variants": {
             "video": {"client": "Početna strana prenosi {mb} MB (video dodatno {video_mb} MB). " + _TEZINA}
@@ -91,7 +92,7 @@ FINDINGS: dict[str, dict] = {
             "{zahteva:n:odvojeno preuzimanje|odvojena preuzimanja|odvojenih preuzimanja}. Svako ima "
             "svoju režiju, što se najviše oseti na mobilnoj vezi."
         ),
-        "tech": "request_count={zahteva} (reached={reached})",
+        "tech": "requests_at_load={zahteva}, sa onim posle load {ukupno_zahteva} (reached={reached})",
     },
     "perf.load.time": {
         "client": (

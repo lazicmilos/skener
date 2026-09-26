@@ -243,10 +243,18 @@ class SiteSnapshot:
 # --------------------------------------------------------------------------- #
 @dataclass
 class NetworkStats:
+    """Mrežni saobraćaj početne. Prag i rečenica za klijenta gledaju samo zahteve započete
+    pre `load` glavnog dokumenta (Z-24); ukupne vrednosti su informativne.
+    """
+
     request_count: int = 0
     total_bytes: int = 0
     bytes_by_type: dict[str, int] = field(default_factory=dict)
     unmeasured_responses: int = 0
+    requests_at_load: int = 0
+    bytes_at_load: int = 0
+    bytes_by_type_at_load: dict[str, int] = field(default_factory=dict)
+    unmeasured_at_load: int = 0
 
 
 @dataclass

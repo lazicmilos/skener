@@ -201,8 +201,8 @@ generiše ponovo; CI proverava samo da u njoj nije izostala nijedna provera iz r
 | `a11y.img.alt.missing` | 2 | a11y | low | ≥ 5 slika i udeo bez alt atributa > 0,5; > 0,8 uz ≥ 15 slika → high; zdravstvo/institucija → bar medium |
 | `perf.img.oversized` | 2 | perf | medium | ≥ 3 slike sa odnosom > 2,5 ili procenjen višak > 700 kB |
 | `perf.load.time` | 2 | perf | high | > 4 s medium · > 8 s high · prekid posle tvrdog limita = high |
-| `perf.page.weight` | 2 | perf | critical | preneto, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical |
-| `perf.request.count` | 2 | perf | high | > 100 medium · > 150 high |
+| `perf.page.weight` | 2 | perf | critical | preneto do load, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical |
+| `perf.request.count` | 2 | perf | high | zahtevi do load: > 100 medium · > 150 high |
 | `qa.console.errors` | 2 | qa | low | > thresholds.qa.console_errors (3) |
 | `seo.h1.missing` | 2 | seo | high | h1_count == 0 posle učitavanja u browseru |
 | `seo.h1.multiple` | 2 | seo | low | h1_count > thresholds.seo.h1_multiple (3) |
@@ -234,7 +234,7 @@ ispisuje obe. Isto važi za razloge zašto nešto nije provereno i zašto je dom
 
 | Prag | Vrednost | Obrazloženje |
 |---|---|---|
-| težina početne | 3 / 5 / 8 MB prenetih bajtova, bez videa | Otprilike medijana, p75 i p90 za 60 pravih sajtova (2,8, 5,2 i 8,1 MB). Broji se ono što je stvarno stiglo preko mreže. JS i CSS putuju sažeti, pa je raspakovano telo kod jednog sajta pokazivalo 25 MB, a preneto je 3,8 MB. Video se ne računa, jer se skida koliko vreme merenja dozvoli: isti sajt je u jednom prolazu preneo 77 MB videa, a u drugom 39 MB. |
+| težina početne | 3 / 5 / 8 MB prenetih bajtova, bez videa | Otprilike medijana, p75 i p90 za 60 pravih sajtova (2,8, 5,2 i 8,1 MB). Broji se ono što je stvarno stiglo preko mreže. JS i CSS putuju sažeti, pa je raspakovano telo kod jednog sajta pokazivalo 25 MB, a preneto je 3,8 MB. Video se ne računa, jer se skida koliko vreme merenja dozvoli: isti sajt je u jednom prolazu preneo 77 MB videa, a u drugom 39 MB. Broje se samo zahtevi započeti pre događaja `load`, i isto važi za broj zahteva. Posle `load` stižu analitika, chat i lenje slike, pa je isti sajt jednom imao 179, a drugi put 281 zahtev. Ukupno, sa onim posle `load`, stoji samo u tehničkoj rečenici. |
 | vreme učitavanja | meri se jedno po jedno | Kad se tri sajta učitavaju odjednom, dele istu vezu i produžavaju jedan drugom vreme i do 4,6 puta. Zato se do događaja `load` učitava jedan po jedan, a skrol i čitanje stranice idu paralelno. |
 | dijakritici za prepoznavanje srpskog | 0,005 | Srpski latinicom ima 2–5 % dijakritika, engleski nula. Prag je deset puta niži od očekivanog da izdrži kratke tekstove, a i dalje je deset puta iznad šuma. |
 | pogrešna oznaka jezika | medium | Google jezik stranice određuje iz sadržaja i `lang` ne koristi. Posledica je pristupačnost (čitači ekrana), ne pozicija u pretrazi. |

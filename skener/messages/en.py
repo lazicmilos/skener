@@ -61,8 +61,9 @@ FINDINGS: dict[str, dict] = {
     "perf.page.weight": {
         "client": "The home page transfers {mb} MB. " + _WEIGHT,
         "tech": (
-            "total_bytes={bajtova}, without video {mb} MB, video {video_mb} MB, requests={zahteva}, "
-            "unmeasured={nemereno}, reached={reached}"
+            "bytes_at_load={bajtova}, without video {mb} MB, video {video_mb} MB, requests={zahteva}, "
+            "unmeasured={nemereno}, reached={reached}; including what came after load {ukupno_bajtova} B "
+            "and {ukupno_zahteva} requests (informational)"
         ),
         "variants": {
             "video": {"client": "The home page transfers {mb} MB (plus {video_mb} MB of video). " + _WEIGHT}
@@ -73,7 +74,7 @@ FINDINGS: dict[str, dict] = {
             "Opening the home page starts {zahteva:n:separate download|separate downloads}. Each one "
             "carries its own overhead, which is felt most on a mobile connection."
         ),
-        "tech": "request_count={zahteva} (reached={reached})",
+        "tech": "requests_at_load={zahteva}, {ukupno_zahteva} including those after load (reached={reached})",
     },
     "perf.load.time": {
         "client": (

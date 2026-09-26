@@ -81,14 +81,14 @@
   "check_id": "perf.page.weight",
   "severity": "medium",
   "client": "Početna strana prenosi 2,1 MB. Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 4,5 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=2100000, bez videa 2.1 MB, video 0.0 MB, zahteva=60, nemereno=0, reached=load"
+  "tech": "bytes_at_load=2100000, bez videa 2.1 MB, video 0.0 MB, zahteva=60, nemereno=0, reached=load; sa onim posle load 2100000 B i 60 zahteva (informativno)"
  },
  {
   "slucaj": "ispitni/spec/domaceizsrbije.rs",
   "check_id": "perf.request.count",
   "severity": "high",
   "client": "Otvaranje početne strane pokreće 175 odvojenih preuzimanja. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=175 (reached=load)"
+  "tech": "requests_at_load=175, sa onim posle load 175 (reached=load)"
  },
  {
   "slucaj": "ispitni/spec/domaceizsrbije.rs",
@@ -116,7 +116,7 @@
   "check_id": "perf.page.weight",
   "severity": "medium",
   "client": "Početna strana prenosi 2,6 MB. Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 5,3 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=2600000, bez videa 2.6 MB, video 0.0 MB, zahteva=175, nemereno=0, reached=load"
+  "tech": "bytes_at_load=2600000, bez videa 2.6 MB, video 0.0 MB, zahteva=175, nemereno=0, reached=load; sa onim posle load 2600000 B i 175 zahteva (informativno)"
  },
  {
   "slucaj": "ispitni/spec/mensa.rs",
@@ -165,7 +165,7 @@
   "check_id": "perf.page.weight",
   "severity": "critical",
   "client": "Početna strana prenosi 14,9 MB. Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 25,8 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=14903221, bez videa 14.9 MB, video 0.0 MB, zahteva=87, nemereno=0, reached=load"
+  "tech": "bytes_at_load=14903221, bez videa 14.9 MB, video 0.0 MB, zahteva=87, nemereno=0, reached=load; sa onim posle load 14903221 B i 87 zahteva (informativno)"
  },
  {
   "slucaj": "ispitni/spec/restoranmb.com",
@@ -256,7 +256,7 @@
   "check_id": "perf.request.count",
   "severity": "high",
   "client": "Otvaranje početne strane pokreće 175 odvojenih preuzimanja. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=175 (reached=load)"
+  "tech": "requests_at_load=175, sa onim posle load 175 (reached=load)"
  },
  {
   "slucaj": "ispitni/toml/domaceizsrbije.rs",
@@ -326,7 +326,7 @@
   "check_id": "perf.page.weight",
   "severity": "critical",
   "client": "Početna strana prenosi 14,9 MB. Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 25,8 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=14903221, bez videa 14.9 MB, video 0.0 MB, zahteva=87, nemereno=0, reached=load"
+  "tech": "bytes_at_load=14903221, bez videa 14.9 MB, video 0.0 MB, zahteva=87, nemereno=0, reached=load; sa onim posle load 14903221 B i 87 zahteva (informativno)"
  },
  {
   "slucaj": "ispitni/toml/restoranmb.com",
@@ -501,14 +501,14 @@
   "check_id": "perf.page.weight",
   "severity": "critical",
   "client": "Početna strana prenosi 25 MB. Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 42,7 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=25000000, bez videa 25.0 MB, video 0.0 MB, zahteva=30, nemereno=0, reached=load"
+  "tech": "bytes_at_load=25000000, bez videa 25.0 MB, video 0.0 MB, zahteva=30, nemereno=0, reached=load; sa onim posle load 25000000 B i 30 zahteva (informativno)"
  },
  {
   "slucaj": "nivo2/perf.request.count",
   "check_id": "perf.request.count",
   "severity": "high",
   "client": "Otvaranje početne strane pokreće 175 odvojenih preuzimanja. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=175 (reached=load)"
+  "tech": "requests_at_load=175, sa onim posle load 175 (reached=load)"
  },
  {
   "slucaj": "nivo2/qa.console.errors",
@@ -536,7 +536,7 @@
   "check_id": "perf.page.weight",
   "severity": "critical",
   "client": "Početna strana prenosi 22 MB (video dodatno 8 MB). Na sporijoj mobilnoj vezi (4,8 Mb/s) za to je potrebno oko 37,7 s, a mnogi posetioci ne čekaju toliko.",
-  "tech": "total_bytes=30000000, bez videa 22.0 MB, video 8.0 MB, zahteva=30, nemereno=0, reached=load"
+  "tech": "bytes_at_load=30000000, bez videa 22.0 MB, video 8.0 MB, zahteva=30, nemereno=0, reached=load; sa onim posle load 30000000 B i 30 zahteva (informativno)"
  },
  {
   "slucaj": "posebno/prekid-ucitavanja",
@@ -599,21 +599,21 @@
   "check_id": "perf.request.count",
   "severity": "medium",
   "client": "Otvaranje početne strane pokreće 101 odvojeno preuzimanje. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=101 (reached=load)"
+  "tech": "requests_at_load=101, sa onim posle load 101 (reached=load)"
  },
  {
   "slucaj": "posebno/zahtevi-102",
   "check_id": "perf.request.count",
   "severity": "medium",
   "client": "Otvaranje početne strane pokreće 102 odvojena preuzimanja. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=102 (reached=load)"
+  "tech": "requests_at_load=102, sa onim posle load 102 (reached=load)"
  },
  {
   "slucaj": "posebno/zahtevi-150",
   "check_id": "perf.request.count",
   "severity": "medium",
   "client": "Otvaranje početne strane pokreće 150 odvojenih preuzimanja. Svako ima svoju režiju, što se najviše oseti na mobilnoj vezi.",
-  "tech": "request_count=150 (reached=load)"
+  "tech": "requests_at_load=150, sa onim posle load 150 (reached=load)"
  },
  {
   "slucaj": "posebno/naslov-3",

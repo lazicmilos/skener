@@ -157,6 +157,10 @@ def browser(
             request_count=request_count,
             total_bytes=total_bytes,
             bytes_by_type={"image": int(total_bytes * 0.8), "script": int(total_bytes * 0.15)},
+            # §12.4 opisuje stanje do `load`; posle njega ove stranice ne učitavaju ništa.
+            requests_at_load=request_count,
+            bytes_at_load=total_bytes,
+            bytes_by_type_at_load={"image": int(total_bytes * 0.8), "script": int(total_bytes * 0.15)},
         ),
         timing=TimingStats(dom_content_loaded_ms=load_ms // 2, load_ms=load_ms, reached="load"),
         dom=DomStats(

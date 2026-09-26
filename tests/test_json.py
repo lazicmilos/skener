@@ -10,11 +10,11 @@ import jsonschema
 import pytest
 from factories import clean_browser
 
-from skener import pipeline, store
+from skener import pipeline
 from skener.checks import registry
 from skener.config import load_config
 from skener.messages import reason
-from skener.models import CheckResult, to_jsonable
+from skener.models import BrowserSnapshot, from_dict, to_jsonable
 from skener.report import json_out
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -47,43 +47,26 @@ def test_sema_odbija_nepoznato_polje():
 # --------------------------------------------------------------------------- #
 # Snapshoti iz 1.x ostaju čitljivi: na njima je kalibrisana lista A
 # --------------------------------------------------------------------------- #
-@pytest.fixture
-def provera_novog_polja(monkeypatch):
-    """Provera nivoa 2 koja čita polje uvedeno u v2, kakvih će biti u F2."""
-    pozvana = []
-
-    def fn(snapshot, ctx):
-        pozvana.append(snapshot.domain)
-        return CheckResult(check_id="test.novo.polje", status="ok")
-
-    spec = registry.CheckSpec(
-        check_id="test.novo.polje",
-        level=2,
-        category="perf",
-        base_severity="low",
-        requires=("browser", "v2:network.bytes_at_load"),
-        description="proba",
-        threshold="proba",
-        fn=fn,
-    )
-    registry.load_all()
-    monkeypatch.setitem(registry.REGISTRY, spec.check_id, spec)
-    return pozvana
+def _v1(browser: BrowserSnapshot) -> BrowserSnapshot:
+    """Snimak nivoa 2 kakav je zapisivala verzija 1.0.0: bez polja uvedenih u v2 (Z-24)."""
+    podaci = to_jsonable(browser)
+    podaci["scanner_version"] = "1.0.0"
+    for polje in ("requests_at_load", "bytes_at_load", "bytes_by_type_at_load", "unmeasured_at_load"):
+        del podaci["network"][polje]
+    return from_dict(BrowserSnapshot, podaci)
 
 
-def test_v1_snapshot_daje_unknown_a_ne_pad(provera_novog_polja):
-    (_site, browser), *_ = [(s, b) for s, b in store.read_all(FIXTURES) if b is not None]
-    assert browser.scanner_version.startswith("1.")
+@pytest.mark.parametrize(
+    "check_id, polje",
+    [
+        ("perf.page.weight", "network.bytes_at_load"),
+        ("perf.request.count", "network.requests_at_load"),
+    ],
+)
+def test_v1_snapshot_daje_unknown_a_ne_pad(check_id, polje):
+    """Podrazumevana nula bi bila `ok` za težinu koju niko nije izmerio."""
+    browser = _v1(clean_browser())
     ctx = registry.Context(domain=browser.domain, industry="ostalo", config=load_config())
-    rezultat = {r.check_id: r for r in registry.run(2, browser, ctx)}["test.novo.polje"]
+    rezultat = {r.check_id: r for r in registry.run(2, browser, ctx)}[check_id]
     assert rezultat.status == "unknown"
-    ocekivano = f"snapshot iz verzije {browser.scanner_version} nema network.bytes_at_load"
-    assert reason(rezultat.reason) == ocekivano
-    assert provera_novog_polja == [], "provera se ne izvršava nad snapshotom koji nema polje"
-
-
-def test_v2_snapshot_izvrsava_proveru(provera_novog_polja):
-    browser = clean_browser()
-    ctx = registry.Context(domain=browser.domain, industry="ostalo", config=load_config())
-    rezultat = {r.check_id: r for r in registry.run(2, browser, ctx)}["test.novo.polje"]
-    assert rezultat.status == "ok" and provera_novog_polja == [browser.domain]
+    assert reason(rezultat.reason) == f"snapshot iz verzije 1.0.0 nema {polje}"

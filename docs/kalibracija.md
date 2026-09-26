@@ -3,6 +3,16 @@
 Dnevnik odluka iz provera na pravim sajtovima. Oblik: **zapažanje — uzrok — odluka**.
 Kako se provera radi, piše u [`provera-na-pravim-sajtovima.md`](provera-na-pravim-sajtovima.md).
 
+## 2026-09-26 — težina i broj zahteva do događaja `load` (Z-24)
+
+- **Zapažanje:** u IT-SKENER-002 (O-10) isti sajt je u dva prolaza imao 179, pa 281 zahtev (+57 %).
+- **Uzrok:** brojač je sabirao sve do kraja mirovanja mreže, skrola i čekanja na tela, a posle
+  `load` stižu analitika, chat i lenje slike, koliko ih vreme merenja uhvati.
+- **Odluka:** prag i rečenica za klijenta gledaju samo zahteve započete pre `load`, a telo takvog
+  zahteva se broji i kad stigne posle njega. Pragovi 3 / 5 / 8 MB i 100 / 150 zahteva ostaju, iako
+  su kalibrisani na ukupnim vrednostima; nova raspodela se meri u Z-50. Prihvatanje: deset sajtova
+  sa liste A, po dva merenja, razlika ≤ 10 % kod bar 9 od 10.
+
 ## 2026-09-26 — `seo.canonical.duplicate` broji samo tuđi canonical (Z-23)
 
 - **Zapažanje:** u IT-SKENER-002 (O-9) dve podstranice od sedam, koje upućuju na početnu, dale su

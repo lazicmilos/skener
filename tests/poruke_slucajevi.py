@@ -62,8 +62,8 @@ def slucajevi() -> Iterator[tuple[str, Finding]]:
         yield from ((f"nivo2/{check_id}", f) for f in _nalazi(2, _browser(pokvari)))
 
     def video(b: Any) -> None:
-        b.network.total_bytes = 30_000_000
-        b.network.bytes_by_type = {"media": 8_000_000, "image": 22_000_000}
+        b.network.total_bytes = b.network.bytes_at_load = 30_000_000
+        b.network.bytes_by_type = b.network.bytes_by_type_at_load = {"media": 8_000_000, "image": 22_000_000}
 
     def prekid(b: Any) -> None:
         b.timing.reached = "timeout"
@@ -82,10 +82,11 @@ def slucajevi() -> Iterator[tuple[str, Finding]]:
         posebni.append((f"h1-{broj}", 2, _browser(lambda b, n=broj: setattr(b.dom, "h1_count", n))))
     for broj in (4, 7, 21):
         posebni.append((f"konzola-{broj}", 2, _browser(lambda b, n=broj: setattr(b.console, "errors", n))))
+    def zahtevi(b: Any, n: int) -> None:
+        b.network.request_count = b.network.requests_at_load = n
+
     for broj in (101, 102, 150):
-        posebni.append(
-            (f"zahtevi-{broj}", 2, _browser(lambda b, n=broj: setattr(b.network, "request_count", n)))
-        )
+        posebni.append((f"zahtevi-{broj}", 2, _browser(lambda b, n=broj: zahtevi(b, n))))
     for broj in (3, 5):
         posebni.append((f"naslov-{broj}", 1, _site(lambda s, n=broj: _isti(s, "title", n))))
         posebni.append((f"opis-{broj}", 1, _site(lambda s, n=broj: _isti(s, "meta_description", n))))
@@ -152,7 +153,7 @@ def razlozi() -> Iterator[tuple[str, str, Any]]:
     nivo2 = {
         "browser-pao": BrowserSnapshot(domain="cist.rs", status="failed"),
         "bez-saobracaja": browser(lambda b: setattr(b.network, "request_count", 0)),
-        "nemereni-odgovori": browser(lambda b: setattr(b.network, "unmeasured_responses", 9)),
+        "nemereni-odgovori": browser(lambda b: setattr(b.network, "unmeasured_at_load", 9)),
         "prekid-ucitavanja": browser(prekid),
         "vreme-nije-mereno": browser(lambda b: setattr(b.timing, "load_ms", None)),
         "nemerene-slike": browser(nemerene_slike),

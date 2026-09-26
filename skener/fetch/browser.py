@@ -98,24 +98,45 @@ _TIMING = """
 
 
 class _Recorder:
-    """Sabira stvarne odgovore dok stižu (§7.2)."""
+    """Sabira stvarne odgovore dok stižu (§7.2).
+
+    Svaki zahtev pripada fazi u kojoj je **počeo**: pre ili posle `load` glavnog dokumenta.
+    Telo zahteva započetog pre `load` broji se u „do load" i kad stigne kasnije (Z-24). Posle
+    `load` stižu analitika, chat i lenje slike, pa je isti sajt jednom imao 179, a drugi put 281
+    zahtev; broj koji ide klijentu mora da se ponovi.
+    """
 
     def __init__(self) -> None:
         self.request_count = 0
         self.total_bytes = 0
         self.by_type: dict[str, int] = {}
         self.unmeasured = 0
+        self.requests_at_load = 0
+        self.bytes_at_load = 0
+        self.by_type_at_load: dict[str, int] = {}
+        self.unmeasured_at_load = 0
         self.bytes_by_url: dict[str, int] = {}
         self.console_errors = 0
         self.console_warnings = 0
         self.samples: list[str] = []
-        self._tasks: list[asyncio.Task] = []
+        self._loaded = False
+        # Po `id`, jer lažni zahtevi u testovima nemaju hash; vrednost drži objekat živim, pa se
+        # `id` ne ponavlja.
+        self._pre_load: dict[int, Any] = {}
+        self._tasks: dict[asyncio.Task, bool] = {}
 
-    def on_request(self, _request: Any) -> None:
+    def on_request(self, request: Any) -> None:
         self.request_count += 1
+        if not self._loaded:
+            self.requests_at_load += 1
+            self._pre_load[id(request)] = request
+
+    def on_load(self, _page: Any) -> None:
+        self._loaded = True
 
     def on_response(self, response: Any) -> None:
-        self._tasks.append(asyncio.create_task(self._measure(response)))
+        at_load = id(response.request) in self._pre_load
+        self._tasks[asyncio.create_task(self._measure(response, at_load))] = at_load
 
     def on_console(self, message: Any) -> None:
         if message.type == "error":
@@ -130,7 +151,7 @@ class _Recorder:
         if len(self.samples) < CONSOLE_SAMPLES:
             self.samples.append(str(error)[:300])
 
-    async def _measure(self, response: Any) -> None:
+    async def _measure(self, response: Any, at_load: bool) -> None:
         url = response.url
         # `data:` i `blob:` su već u HTML-u — brojanjem ih dupliraš (§7.2).
         if url.startswith(("data:", "blob:")):
@@ -153,12 +174,16 @@ class _Recorder:
         if size is None:
             # Ne broj nulu — nula je tačno greška koju spec opisuje kod Performance API-ja.
             self.unmeasured += 1
+            self.unmeasured_at_load += at_load
             return
 
         kind = _resource_type(response)
         self.total_bytes += size
         self.by_type[kind] = self.by_type.get(kind, 0) + size
         self.bytes_by_url[url] = size
+        if at_load:
+            self.bytes_at_load += size
+            self.by_type_at_load[kind] = self.by_type_at_load.get(kind, 0) + size
 
     async def drain(self, timeout: float) -> None:
         """Telo koje ne stigne za `timeout` je nemereno, ne nula.
@@ -171,6 +196,7 @@ class _Recorder:
             for task in pending:
                 task.cancel()
                 self.unmeasured += 1
+                self.unmeasured_at_load += self._tasks[task]
             self._tasks.clear()
 
 
@@ -253,6 +279,7 @@ async def capture(
         await context.route("**/*", _cuvar(addresses.allowlist(config), PlaywrightError))
         page = await context.new_page()
         page.on("request", recorder.on_request)
+        page.on("load", recorder.on_load)
         page.on("response", recorder.on_response)
         page.on("console", recorder.on_console)
         page.on("pageerror", recorder.on_page_error)
@@ -293,6 +320,10 @@ async def capture(
             total_bytes=recorder.total_bytes,
             bytes_by_type=recorder.by_type,
             unmeasured_responses=recorder.unmeasured,
+            requests_at_load=recorder.requests_at_load,
+            bytes_at_load=recorder.bytes_at_load,
+            bytes_by_type_at_load=recorder.by_type_at_load,
+            unmeasured_at_load=recorder.unmeasured_at_load,
         )
         snapshot.console = ConsoleStats(
             errors=recorder.console_errors,

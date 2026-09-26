@@ -260,7 +260,7 @@ def test_poruka_o_greskama_u_konzoli_je_pravilna(lang, greske, ocekivano):
 )
 def test_poruka_o_broju_zahteva_je_pravilna(lang, zahteva, ocekivano):
     browser = clean_browser()
-    browser.network.request_count = zahteva
+    browser.network.requests_at_load = zahteva
     poruka = render(run_level(2, browser)["perf.request.count"].findings[0], lang).client
     assert ocekivano in poruka, poruka
 
@@ -307,8 +307,8 @@ def test_poruka_o_istom_opisu_je_pravilna(lang, broj, ocekivano):
 # --------------------------------------------------------------------------- #
 def _tezina(ukupno: int, po_tipu: dict[str, int]):
     browser = clean_browser()
-    browser.network.total_bytes = ukupno
-    browser.network.bytes_by_type = po_tipu
+    browser.network.bytes_at_load = ukupno
+    browser.network.bytes_by_type_at_load = po_tipu
     return run_level(2, browser)["perf.page.weight"].findings[0]
 
 

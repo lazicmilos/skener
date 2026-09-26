@@ -117,42 +117,46 @@ def html_size(snapshot: SiteSnapshot, ctx: Context):
     level=2,
     category="perf",
     base_severity="critical",
-    requires=["network"],
-    description="Ukupna težina početne strane.",
-    threshold="preneto, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical",
+    requires=["network", "v2:network.bytes_at_load"],
+    description="Težina početne strane: šta se prenese za zahteve započete do događaja `load`.",
+    threshold="preneto do load, bez videa: > 3 MB medium · > 5 MB high · > 8 MB critical",
 )
 def page_weight(snapshot, ctx: Context):
     network = snapshot.network
+    # Bez `load` mera „do load" je nepotpuna, pa ni velik broj nije tvrdnja (Z-24).
+    if snapshot.timing.reached != "load":
+        return unknown(page_weight.spec, "load_incomplete")
     max_unmeasured = ctx.th("browser.max_unmeasured_responses")
-    if network.unmeasured_responses > max_unmeasured:
+    if network.unmeasured_at_load > max_unmeasured:
         # Merenje u koje nemaš poverenja gore je od merenja kojeg nema (§7.2).
-        nemereno = network.unmeasured_responses
+        nemereno = network.unmeasured_at_load
         return unknown(page_weight.spec, "unmeasured_responses", nemereno=nemereno, prag=max_unmeasured)
 
     # Video se skida koliko vreme merenja dozvoli — isti sajt je izmeren jednom 8,5, a
     # drugi put 26,9 MB — pa ne ulazi u prag, nego stoji posebno u poruci (O-2).
-    video = network.bytes_by_type.get("media", 0)
+    video = network.bytes_by_type_at_load.get("media", 0)
     video_mb = round(video / BYTES_PER_MB, 1)
-    mb = (network.total_bytes - video) / BYTES_PER_MB
+    mb = (network.bytes_at_load - video) / BYTES_PER_MB
     severity = _tier(mb, ctx.th("thresholds.perf.page_weight_mb"))
     if severity is None:
-        if snapshot.timing.reached == "timeout":
-            return unknown(page_weight.spec, "load_incomplete")
         return ok(page_weight.spec)
     return finding(
         page_weight.spec,
         ctx,
         severity=severity,
         evidence={
-            "bajtova": network.total_bytes,
+            "bajtova": network.bytes_at_load,
             "mb": round(mb, 1),
             "video_mb": video_mb,
             "sekundi": _seconds_on_mobile(mb, ctx),
             "brzina": ctx.th("thresholds.perf.mobile_speed_mbps"),
-            "zahteva": network.request_count,
-            "nemereno": network.unmeasured_responses,
+            "zahteva": network.requests_at_load,
+            "nemereno": network.unmeasured_at_load,
             "reached": snapshot.timing.reached,
-            "po_tipu": network.bytes_by_type,
+            "po_tipu": network.bytes_by_type_at_load,
+            # Sa onim što stigne posle `load`, i sa videom: samo informativno, van praga.
+            "ukupno_bajtova": network.total_bytes,
+            "ukupno_zahteva": network.request_count,
         },
         urls=[snapshot.url],
         variant="video" if video else None,
@@ -164,12 +168,12 @@ def page_weight(snapshot, ctx: Context):
     level=2,
     category="perf",
     base_severity="high",
-    requires=["network"],
-    description="Broj mrežnih zahteva pri otvaranju početne.",
-    threshold="> 100 medium · > 150 high",
+    requires=["network", "v2:network.requests_at_load"],
+    description="Broj mrežnih zahteva započetih do događaja `load` pri otvaranju početne.",
+    threshold="zahtevi do load: > 100 medium · > 150 high",
 )
 def request_count(snapshot, ctx: Context):
-    count = snapshot.network.request_count
+    count = snapshot.network.requests_at_load
     severity = _tier(count, ctx.th("thresholds.perf.request_count"))
     if severity is None:
         if snapshot.timing.reached == "timeout":
@@ -181,6 +185,7 @@ def request_count(snapshot, ctx: Context):
         severity=severity,
         evidence={
             "zahteva": count,
+            "ukupno_zahteva": snapshot.network.request_count,
             "reached": snapshot.timing.reached,
         },
         urls=[snapshot.url],

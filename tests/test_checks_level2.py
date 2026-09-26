@@ -23,8 +23,14 @@ def test_pokrivene_su_sve_registrovane_provere():
 
 
 POZITIVNI = {
-    "perf.page.weight": lambda b: setattr(b.network, "total_bytes", 25_000_000),
-    "perf.request.count": lambda b: setattr(b.network, "request_count", 175),
+    "perf.page.weight": lambda b: (
+        setattr(b.network, "bytes_at_load", 25_000_000),
+        setattr(b.network, "total_bytes", 25_000_000),
+    ),
+    "perf.request.count": lambda b: (
+        setattr(b.network, "requests_at_load", 175),
+        setattr(b.network, "request_count", 175),
+    ),
     "perf.load.time": lambda b: setattr(b.timing, "load_ms", 9_000),
     "seo.h1.missing": lambda b: setattr(b.dom, "h1_count", 0),
     "seo.h1.multiple": lambda b: setattr(b.dom, "h1_count", 5),
@@ -86,7 +92,7 @@ def test_pozitivan_nalaz(check_id):
 )
 def test_tezina_stranice_stepenasto(total_bytes, expected):
     browser = clean_browser()
-    browser.network.total_bytes = total_bytes
+    browser.network.bytes_at_load = total_bytes
     result = run_level(2, browser)["perf.page.weight"]
     if expected is None:
         assert result.status == "ok"
@@ -98,7 +104,7 @@ def test_tezina_stranice_stepenasto(total_bytes, expected):
 @pytest.mark.parametrize("count, expected", [(50, None), (120, "medium"), (175, "high")])
 def test_broj_zahteva_stepenasto(count, expected):
     browser = clean_browser()
-    browser.network.request_count = count
+    browser.network.requests_at_load = count
     result = run_level(2, browser)["perf.request.count"]
     assert (result.findings[0].severity if expected else result.status) == (expected or "ok")
 
@@ -163,9 +169,40 @@ def test_visok_udeo_prelazi_u_high_bez_obzira_na_delatnost():
 # --------------------------------------------------------------------------- #
 # `unknown` — merenje u koje nemaš poverenja gore je od merenja kojeg nema (§7.2)
 # --------------------------------------------------------------------------- #
+def test_bez_load_tezina_je_unknown():
+    """Z-24: bez `load` mera „do load" je nepotpuna, pa ni težina od 20 MB nije tvrdnja."""
+    browser = clean_browser()
+    browser.timing.reached = "timeout"
+    browser.network.total_bytes = browser.network.bytes_at_load = 20_000_000
+    result = run_level(2, browser)["perf.page.weight"]
+    assert result.status == "unknown" and result.reason.code == "load_incomplete"
+
+
+def test_tezina_i_broj_zahteva_ne_broje_ono_sto_pocne_posle_load():
+    """Posle `load` stižu analitika, chat i lenje slike: isti sajt je imao 179, pa 281 zahtev."""
+    browser = clean_browser()
+    browser.network.total_bytes = 20_000_000
+    browser.network.request_count = 281
+    rezultati = run_level(2, browser)
+    assert rezultati["perf.page.weight"].status == "ok"
+    assert rezultati["perf.request.count"].status == "ok"
+
+
+def test_ukupno_posle_load_je_samo_u_tehnickoj_recenici():
+    browser = clean_browser()
+    browser.network.bytes_at_load = 6_000_000
+    browser.network.total_bytes = 9_000_000
+    nalaz = run_level(2, browser)["perf.page.weight"].findings[0]
+    assert nalaz.severity == "high", "6 MB do load, a ne 9 MB ukupno"
+    assert "prenosi 6 MB" in render(nalaz, "sr").client
+    assert "9000000" in render(nalaz, "sr").tech
+
+
 def test_previse_neizmerenih_odgovora_je_unknown():
     browser = clean_browser()
-    browser.network = NetworkStats(request_count=40, total_bytes=500_000, unmeasured_responses=9)
+    browser.network = NetworkStats(
+        request_count=40, requests_at_load=40, bytes_at_load=500_000, unmeasured_at_load=9
+    )
     result = run_level(2, browser)["perf.page.weight"]
     assert result.status == "unknown"
     assert "nije izmereno" in reason(result.reason)
@@ -243,15 +280,15 @@ def test_veliki_visak_bajtova_pali_nalaz_i_ispod_tri_slike():
 def test_video_se_ne_racuna_u_prag_tezine():
     """Isti sajt je u jednom prolazu preneo 77 MB videa, a u drugom 39 MB."""
     browser = clean_browser()
-    browser.network.total_bytes = 24_500_000
-    browser.network.bytes_by_type = {"media": 22_000_000, "image": 2_000_000, "script": 500_000}
+    browser.network.bytes_at_load = 24_500_000
+    browser.network.bytes_by_type_at_load = {"media": 22_000_000, "image": 2_000_000, "script": 500_000}
     assert run_level(2, browser)["perf.page.weight"].status == "ok"
 
 
 def test_nalaz_tezine_pominje_video_posebno():
     browser = clean_browser()
-    browser.network.total_bytes = 30_000_000
-    browser.network.bytes_by_type = {"media": 8_000_000, "image": 21_000_000, "script": 1_000_000}
+    browser.network.bytes_at_load = 30_000_000
+    browser.network.bytes_by_type_at_load = {"media": 8_000_000, "image": 21_000_000, "script": 1_000_000}
     nalaz = run_level(2, browser)["perf.page.weight"].findings[0]
     assert nalaz.severity == "critical", "22 MB bez videa je iznad 8 MB"
     assert nalaz.evidence["mb"] == 22.0

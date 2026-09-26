@@ -129,6 +129,11 @@ def clean_browser(*, domain: str = "cist.rs", **overrides: Any) -> BrowserSnapsh
             total_bytes=900_000,
             bytes_by_type={"image": 600_000, "script": 200_000, "css": 100_000},
             unmeasured_responses=0,
+            # Čista stranica ne učitava ništa posle `load`, pa je „do load" isto što i ukupno.
+            requests_at_load=30,
+            bytes_at_load=900_000,
+            bytes_by_type_at_load={"image": 600_000, "script": 200_000, "css": 100_000},
+            unmeasured_at_load=0,
         ),
         timing=TimingStats(dom_content_loaded_ms=800, load_ms=1800, reached="load"),
         dom=DomStats(

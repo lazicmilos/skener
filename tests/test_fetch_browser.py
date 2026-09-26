@@ -107,6 +107,37 @@ def snimak():
         yield snimi(site)
 
 
+SAOBRACAJ_OKO_LOAD = b"""<!doctype html><html><body><h1>Strana</h1>
+<script>
+fetch('/sporo.bin');
+window.addEventListener('load', () => setTimeout(() => fetch('/posle.bin'), 100));
+</script></body></html>"""
+
+
+@pytest.fixture(scope="module")
+def oko_load():
+    """Z-24: zahtev pre `load` čije telo stiže posle njega, i zahtev koji počne tek posle `load`."""
+    extra = {
+        "/": Response(SAOBRACAJ_OKO_LOAD),
+        "/sporo.bin": Response(b"s" * 150_000, delay=0.8),
+        "/posle.bin": Response(b"p" * 200_000),
+    }
+    with FakeSite(extra=extra) as site:
+        yield snimi(site)
+
+
+def test_zahtev_posle_load_ne_ulazi_u_tezinu(oko_load):
+    mreza = oko_load.network
+    assert mreza.bytes_at_load < 200_000, "posle.bin (200 kB) ne ulazi u težinu"
+    assert mreza.total_bytes - mreza.bytes_at_load >= 200_000, "ali je u ukupnom, informativno"
+    assert mreza.request_count > mreza.requests_at_load
+
+
+def test_telo_koje_stigne_posle_load_za_zahtev_pre_load_se_broji(oko_load):
+    assert oko_load.timing.load_ms < 800, "telo sporo.bin mora da stigne posle `load`"
+    assert oko_load.network.bytes_at_load >= 150_000
+
+
 def test_browser_belezi_interne_veze_iz_renderovanog_doma():
     """Z-21: vezu koju crta JavaScript vidi samo nivo 2; spoljna veza nije interna."""
     strana = (

@@ -64,6 +64,13 @@ Svaka takva izmena upisuje se ovde u istom commit-u u kom je urađena.
 
 ### Ispravljeno
 
+- Težina i broj zahteva brojali su i ono što stigne posle događaja `load` (analitika, chat, lenje
+  slike), pa je isti sajt jednom imao 179, a drugi put 281 zahtev. Sada se broje samo zahtevi
+  započeti pre `load`; telo koje stigne kasnije za takav zahtev se broji. Ukupno je samo u
+  tehničkoj rečenici i u JSON-u. Kad `load` ne stigne, težina je `unknown`. Snapshot nivoa 2 ima
+  `requests_at_load`, `bytes_at_load`, `bytes_by_type_at_load` i `unmeasured_at_load`, a za
+  snapshot iz 1.x obe provere su `unknown`.
+
 - `seo.canonical.duplicate` je brojao i stranicu koja upućuje na sebe, pa su dve podstranice od
   sedam, sa canonical-om na početnu, davale `critical`. Sada se broje samo stranice sa tuđim
   canonical-om (bar dve, iz dve grupe putanja), a ozbiljnost zavisi od njihovog udela u uzorku:

@@ -101,6 +101,30 @@ def test_bajtovi_se_sabiraju_po_vrsti():
     assert brojac.bytes_by_url["https://d.rs/v.mp4"] == 5000
 
 
+def test_faza_se_belezi_kad_zahtev_pocne():
+    """Z-24: telo zahteva započetog pre `load` pripada fazi „do load" i kad stigne posle nje."""
+    pre = Odgovor(url="https://d.rs/pre.js", vrsta="script", telo=b"x" * 300)
+    visi = Odgovor(url="https://d.rs/strim", vrsta="media", visi=True)
+    posle = Odgovor(url="https://d.rs/chat.js", vrsta="script", telo=b"x" * 200)
+
+    async def run() -> _Recorder:
+        brojac = _Recorder()
+        brojac.on_request(pre.request)
+        brojac.on_request(visi.request)
+        brojac.on_load(None)
+        brojac.on_request(posle.request)
+        for odgovor in (pre, visi, posle):
+            brojac.on_response(odgovor)
+        await brojac.drain(0.2)
+        return brojac
+
+    brojac = asyncio.run(run())
+    assert (brojac.requests_at_load, brojac.request_count) == (2, 3)
+    assert (brojac.bytes_at_load, brojac.total_bytes) == (300, 500)
+    assert brojac.by_type_at_load == {"script": 300}
+    assert (brojac.unmeasured_at_load, brojac.unmeasured) == (1, 1)
+
+
 def test_vrsta_resursa_koja_se_ne_moze_procitati_je_other():
     class BezZahteva:
         @property

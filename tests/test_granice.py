@@ -205,7 +205,7 @@ def test_jezik_oznaka_klase(lang, ocekivano):
 )
 def test_broj_zahteva_granice(zahteva, ocekivano):
     browser = clean_browser()
-    browser.network.request_count = zahteva
+    browser.network.requests_at_load = zahteva
     rezultat = run_level(2, browser)["perf.request.count"]
     assert (rezultat.findings[0].severity if rezultat.findings else None) == ocekivano
 
@@ -235,7 +235,7 @@ def test_vreme_ucitavanja_granice(load_ms, ocekivano):
 )
 def test_nemereni_odgovori_granica(nemereno, ocekivano):
     browser = clean_browser()
-    browser.network.unmeasured_responses = nemereno
+    browser.network.unmeasured_at_load = nemereno
     assert run_level(2, browser)["perf.page.weight"].status == ocekivano
 
 

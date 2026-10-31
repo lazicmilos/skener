@@ -169,7 +169,7 @@ def test_prazan_domen_ne_ruši_nijednu_proveru():
 # Granični slučajevi koje spec izričito imenuje
 # --------------------------------------------------------------------------- #
 def test_zxx_pada_u_invalid_a_ne_u_mismatch():
-    """§12.4, ariaclubzlatibor.rs: lang=zxx mora da padne u `invalid`."""
+    """§12.4, hotel-planina.example: lang=zxx mora da padne u `invalid`."""
     site = clean_site()
     site.home.lang = "zxx"
     results = run_level(1, site)

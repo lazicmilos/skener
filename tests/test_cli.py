@@ -30,7 +30,9 @@ def test_only_filtrira(tmp_path):
 
 def test_upozorenja_iz_liste_idu_u_log_sa_brojem_reda(tmp_path, caplog):
     path = tmp_path / "d.csv"
-    path.write_text("domain,industry\nmensa.rs,institucija\nMENSA.RS,hotel\n", encoding="utf-8")
+    path.write_text(
+        "domain,industry\ninstitucija.example,institucija\nINSTITUCIJA.EXAMPLE,hotel\n", encoding="utf-8"
+    )
     cli.read_domains(path)
     assert "red 3: domen se ponavlja" in caplog.text
 
@@ -58,7 +60,7 @@ def test_izuzeti_iz_konfiguracije_i_sa_komandne_linije(tmp_path):
 
 def test_nepostojeci_fajl_sa_izuzetima_puca_razumljivo(tmp_path):
     domains = tmp_path / "d.csv"
-    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    domains.write_text("domain,industry\ninstitucija.example,institucija\n", encoding="utf-8")
     with pytest.raises(SystemExit, match="fajl sa izuzetim domenima ne postoji"):
         cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), "--exclude", "nema.txt"])
 
@@ -313,7 +315,7 @@ def test_argumenti_komandne_linije_menjaju_konfiguraciju(tmp_path, monkeypatch):
 
     monkeypatch.setattr(cli.pipeline, "scan", scan)
     domains = tmp_path / "d.csv"
-    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    domains.write_text("domain,industry\ninstitucija.example,institucija\n", encoding="utf-8")
     izlaz = tmp_path / "izlaz"
     argumenti = ["--concurrency", "2", "--max-level2", "0", "--format", "csv", "--level", "1"]
     assert cli.main(["scan", str(domains), "--out", str(izlaz), *argumenti]) == 0
@@ -387,7 +389,7 @@ def test_verzija_je_ista_u_paketu_cli_i_user_agentu(capsys, monkeypatch):
 )
 def test_nevazeci_brojevi_na_komandnoj_liniji_se_odbijaju(tmp_path, argumenti):
     domains = tmp_path / "d.csv"
-    domains.write_text("domain,industry\nmensa.rs,institucija\n", encoding="utf-8")
+    domains.write_text("domain,industry\ninstitucija.example,institucija\n", encoding="utf-8")
     with pytest.raises(SystemExit) as izlaz:
         cli.main(["scan", str(domains), "--out", str(tmp_path / "izlaz"), *argumenti])
     assert izlaz.value.code == 2, "argparse odbija pre ijednog zahteva"
@@ -515,16 +517,16 @@ def test_debug_domain_propusta_samo_taj_domen():
     import io
     import logging
 
-    cli.setup_logging("mensa.rs")
+    cli.setup_logging("institucija.example")
     tok = io.StringIO()
     handler = logging.getLogger("skener").handlers[0]
     handler.stream = tok
     log = logging.getLogger("skener.test")
-    log.debug("ovaj se vidi", extra={"domain": "mensa.rs"})
-    log.debug("ovaj ne", extra={"domain": "angolo.rs"})
+    log.debug("ovaj se vidi", extra={"domain": "institucija.example"})
+    log.debug("ovaj ne", extra={"domain": "restoran-ugao.example"})
     redovi = [json.loads(red) for red in tok.getvalue().splitlines()]
     assert [r["message"] for r in redovi] == ["ovaj se vidi"]
-    assert redovi[0]["domain"] == "mensa.rs" and redovi[0]["level"] == "DEBUG"
+    assert redovi[0]["domain"] == "institucija.example" and redovi[0]["level"] == "DEBUG"
     cli.setup_logging(None)
 
 

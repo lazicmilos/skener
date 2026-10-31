@@ -1,7 +1,7 @@
 """Lažni sajt na `localhost` za integracione testove.
 
 Fetcher i browser sloj se ne mogu testirati nad pravim sajtovima: test nad
-`mensa.rs` zavisi od toga da li je Mensa jutros online (§2.1). Ovde je sajt koji
+pravim domenom zavisi od toga da li je taj sajt jutros online (§2.1). Ovde je sajt koji
 je namerno pokvaren na tačno određene načine, pa su testovi offline i
 deterministički.
 """

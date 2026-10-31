@@ -70,9 +70,9 @@ Ulaz je CSV sa zaglavljem, ne gola lista domena:
 
 ```csv
 domain,industry,note
-ariaclubzlatibor.rs,hotel,Zlatibor
-restoranmb.com,restoran,
-protetica.com,zdravstvo,kontrolni čist sajt
+hotel-planina.example,hotel,planina
+restoran-centar.example,restoran,
+klinika.example,zdravstvo,kontrolni čist sajt
 ```
 
 `industry` je jedno od `hotel`, `restoran`, `zdravstvo`, `ecommerce`, `b2b`, `institucija` i
@@ -128,10 +128,10 @@ prolazi šemu.
 skener recheck izvestaj/snapshots/ --out novi/                  # ponovo boduje sačuvano, bez mreže
 skener recheck izvestaj/snapshots/ --config probni-pragovi.toml --out novi/
 skener recheck izvestaj/snapshots/ --lang en --out english/     # isti prolaz, izveštaj na engleskom
-skener record domains.example.csv --out tests/fixtures/
+skener record moji-domeni.csv --out snimci/
 skener explain seo.canonical.duplicate
 skener explain --all --markdown                                 # odavde je tabela provera ispod
-skener scan domains.csv --level 1 --concurrency 4 --only mensa.rs --debug-domain mensa.rs
+skener scan domains.csv --level 1 --concurrency 4 --only institucija.example --debug-domain institucija.example
 ```
 
 `recheck` je glavni alat za kalibraciju. Promeniš prag, pustiš ga nad sačuvanim snapshotima i za
@@ -269,7 +269,7 @@ odluka iz kalibracije. Svaka odluka je upisana i u [`docs/kalibracija.md`](docs/
 
 ```bash
 docker compose run --rm skener pytest -q               # bez mreže, sa pravim Chromium-om, oko 4 min
-docker compose run --rm skener pytest -m live -v       # pravi sajtovi iz ispitnog skupa, traži mrežu
+docker compose run --rm -e SKENER_LIVE_CSV=/rad/live.csv skener pytest -m live -v   # pravi sajtovi sa tvoje liste, traži mrežu
 ```
 
 Prvi sloj ne zavisi od mreže i vrti se u CI-ju na svaki push. Tu su sve provere nad snapshotima,
@@ -302,7 +302,8 @@ Kako se testira i šta je nađeno opisuju [plan testiranja](docs/plan-testiranja
 
 > Fixture-i u `tests/fixtures/` su ručno napisani, nisu snimljeni sa pravih sajtova. Opisuju ono što
 > specifikacija tvrdi za tih osam domena i proveravaju da lanac provera radi nad tim stanjem, sa
-> pragovima iz specifikacije. Da li su domeni danas u tom stanju proverava `pytest -m live`.
+> pragovima iz specifikacije. Domeni su izmišljeni (`.example`). Stvarne sajtove proverava
+> `pytest -m live`, nad listom iz `SKENER_LIVE_CSV`.
 
 ## Etika
 

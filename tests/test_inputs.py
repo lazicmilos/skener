@@ -14,9 +14,9 @@ def procitaj(sadrzaj: str | bytes):
 
 def test_cita_csv_sa_zaglavljem():
     rows, _ = procitaj(
-        "domain,industry,note\nmensa.rs,institucija,beleska\nangolo.rs,,\nprotetica.com,NEPOSTOJECA,\n\n"
+        "domain,industry,note\ninstitucija.example,institucija,beleska\nrestoran-ugao.example,,\nklinika.example,NEPOSTOJECA,\n\n"
     )
-    assert [r.domain for r in rows] == ["mensa.rs", "angolo.rs", "protetica.com"]
+    assert [r.domain for r in rows] == ["institucija.example", "restoran-ugao.example", "klinika.example"]
     assert rows[0].industry == "institucija" and rows[0].note == "beleska"
     assert rows[1].industry == "ostalo", "prazna delatnost pada na `ostalo` (§4.1)"
     assert rows[2].industry == "ostalo", "nepoznata delatnost pada na `ostalo`, ne ruši prolaz"
@@ -45,35 +45,47 @@ def test_csv_bez_domena_puca_razumljivo(sadrzaj):
 # --------------------------------------------------------------------------- #
 def test_csv_iz_excela_sa_tackom_zarezom():
     """Srpska podešavanja Windows-a: Excel „CSV" razdvaja kolone sa `;`."""
-    rows, _ = procitaj("domain;industry;note\nmensa.rs;institucija;beleška\n")
-    assert [(r.domain, r.industry, r.note) for r in rows] == [("mensa.rs", "institucija", "beleška")]
+    rows, _ = procitaj("domain;industry;note\ninstitucija.example;institucija;beleška\n")
+    assert [(r.domain, r.industry, r.note) for r in rows] == [
+        ("institucija.example", "institucija", "beleška")
+    ]
 
 
 def test_csv_u_windows_1250():
     """Excel bez „UTF-8" opcije čuva u windows-1250; ranije je ovo bio traceback."""
-    rows, upozorenja = procitaj("domain,industry,note\nmensa.rs,institucija,čćžšđ\n".encode("cp1250"))
+    csv = "domain,industry,note\ninstitucija.example,institucija,čćžšđ\n"
+    rows, upozorenja = procitaj(csv.encode("cp1250"))
     assert rows[0].note == "čćžšđ"
     assert "windows-1250" in upozorenja[0].message
 
 
 def test_csv_duplikati_se_skeniraju_jednom():
     """Isti domen dva puta = dva puta tuđ sajt i dva reda u izveštaju sa istim snapshotom."""
-    rows, _ = procitaj("domain,industry\nmensa.rs,institucija\nMENSA.RS,hotel\nangolo.rs,restoran\n")
-    assert [r.domain for r in rows] == ["mensa.rs", "angolo.rs"]
+    rows, _ = procitaj(
+        "domain,industry\ninstitucija.example,institucija\nINSTITUCIJA.EXAMPLE,hotel\n"
+        "restoran-ugao.example,restoran\n"
+    )
+    assert [r.domain for r in rows] == ["institucija.example", "restoran-ugao.example"]
     assert rows[0].industry == "institucija", "važi prvo pojavljivanje"
 
 
 def test_csv_sa_bom_oznakom():
-    rows, _ = procitaj("domain,industry\nmensa.rs,institucija\n".encode("utf-8-sig"))
-    assert [r.domain for r in rows] == ["mensa.rs"]
+    rows, _ = procitaj("domain,industry\ninstitucija.example,institucija\n".encode("utf-8-sig"))
+    assert [r.domain for r in rows] == ["institucija.example"]
 
 
 # --------------------------------------------------------------------------- #
 # Broj reda: po njemu korisnik nađe red u Excel-u
 # --------------------------------------------------------------------------- #
 def test_upozorenje_nosi_broj_reda_i_domen():
-    _, upozorenja = procitaj("domain,industry\nmensa.rs,institucija\nangolo.rs,picerija\nMENSA.RS,hotel\n")
-    assert [(u.row, u.domain) for u in upozorenja] == [(3, "angolo.rs"), (4, "MENSA.RS")]
+    _, upozorenja = procitaj(
+        "domain,industry\ninstitucija.example,institucija\nrestoran-ugao.example,picerija\n"
+        "INSTITUCIJA.EXAMPLE,hotel\n"
+    )
+    assert [(u.row, u.domain) for u in upozorenja] == [
+        (3, "restoran-ugao.example"),
+        (4, "INSTITUCIJA.EXAMPLE"),
+    ]
 
 
 @pytest.mark.parametrize(

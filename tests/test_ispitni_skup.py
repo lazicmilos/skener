@@ -1,12 +1,12 @@
 """Ispitni skup iz §12.4 — izvršni oblik tabele iz specifikacije.
 
 Za svaki domen se traži da je **očekivani skup podskup pronađenog**, a za
-`protetica.com` dodatno da je pronađeni skup mali.
+`klinika.example` dodatno da je pronađeni skup mali.
 
-Pošteno upozorenje: snapshoti u `tests/fixtures/` su **ručno napisani**, ne
-snimljeni sa pravih sajtova (vidi `tests/make_fixtures.py`). Ovi testovi zato
-tvrde da lanac provera radi kako treba nad opisanim stanjem — ne da su ti domeni
-danas u tom stanju. Za ovo drugo treba `skener record` sa mrežom.
+Pošteno upozorenje: snapshoti u `tests/fixtures/` su **ručno napisani**, nad
+izmišljenim domenima pod `.example` (vidi `tests/make_fixtures.py`). Ovi testovi
+zato tvrde da lanac provera radi kako treba nad opisanim stanjem — ne da je ijedan
+pravi sajt u tom stanju. Za ovo drugo služi `pytest -m live` (vidi `tests/test_live.py`).
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ MAX_STAROST_DANA = 90
 
 # (delatnost, obavezni check_id-evi) — prepisano iz tabele u §12.4.
 OCEKIVANO = {
-    "mensa.rs": ("institucija", {"seo.canonical.duplicate", "infra.soft404", "seo.h1.missing"}),
-    "ariaclubzlatibor.rs": (
+    "institucija.example": ("institucija", {"seo.canonical.duplicate", "infra.soft404", "seo.h1.missing"}),
+    "hotel-planina.example": (
         "hotel",
         {
             "seo.canonical.missing",
@@ -41,8 +41,8 @@ OCEKIVANO = {
             "seo.h1.missing",
         },
     ),
-    "restoranmb.com": ("restoran", {"seo.canonical.missing", "perf.page.weight"}),
-    "angolo.rs": (
+    "restoran-centar.example": ("restoran", {"seo.canonical.missing", "perf.page.weight"}),
+    "restoran-ugao.example": (
         "restoran",
         {
             "seo.canonical.missing",
@@ -51,13 +51,13 @@ OCEKIVANO = {
             "social.og.description.missing",
         },
     ),
-    "domaceizsrbije.rs": (
+    "prodavnica.example": (
         "ecommerce",
         {"seo.h1.missing", "perf.page.weight", "perf.request.count"},
     ),
-    "ordinacijadenta.rs": ("zdravstvo", {"i18n.lang.mismatch", "a11y.img.alt.missing"}),
-    "cdei.rs": ("b2b", set()),
-    "protetica.com": ("zdravstvo", set()),
+    "ordinacija.example": ("zdravstvo", {"i18n.lang.mismatch", "a11y.img.alt.missing"}),
+    "b2b-firma.example": ("b2b", set()),
+    "klinika.example": ("zdravstvo", set()),
 }
 
 
@@ -114,22 +114,22 @@ def test_svaki_nalaz_ima_dokaz_i_recenicu(domain, izvestaji):
 # --------------------------------------------------------------------------- #
 # Dodatni uslovi iz kolone „Dodatno"
 # --------------------------------------------------------------------------- #
-def test_mensa_ide_na_nivo_2_i_nema_ijedan_i18n_nalaz(izvestaji):
+def test_institucija_ide_na_nivo_2_i_nema_ijedan_i18n_nalaz(izvestaji):
     """`lang=sr` je ispravan — alat koji tu nešto prijavi laže klijentu."""
-    report = izvestaji["mensa.rs"]
-    assert report.level2_ran, "Mensin sadržaj se crta iz JS-a, mora na nivo 2"
+    report = izvestaji["institucija.example"]
+    assert report.level2_ran, "sadržaj institucije se crta iz JS-a, mora na nivo 2"
     assert report.escalation_reasons
     assert not any(c.startswith("i18n.") for c in ids(report))
 
 
-def test_aria_pada_u_invalid_a_ne_u_mismatch(izvestaji):
-    nalazi = ids(izvestaji["ariaclubzlatibor.rs"])
+def test_hotel_planina_pada_u_invalid_a_ne_u_mismatch(izvestaji):
+    nalazi = ids(izvestaji["hotel-planina.example"])
     assert "i18n.lang.invalid" in nalazi
     assert "i18n.lang.mismatch" not in nalazi, "lang=zxx nije pogrešan jezik, nego nikakav"
 
 
-def test_restoranmb_meri_preko_14_mb_i_daje_critical(izvestaji):
-    report = izvestaji["restoranmb.com"]
+def test_restoran_centar_meri_preko_14_mb_i_daje_critical(izvestaji):
+    report = izvestaji["restoran-centar.example"]
     tezina = next(f for f in report.findings if f.check_id == "perf.page.weight")
     assert tezina.severity == "critical"
     assert tezina.evidence["bajtova"] > 14_000_000
@@ -138,17 +138,17 @@ def test_restoranmb_meri_preko_14_mb_i_daje_critical(izvestaji):
     assert tezina.evidence["bajtova"] != 2048
 
 
-def test_domaceizsrbije_ima_oko_175_zahteva(izvestaji):
-    report = izvestaji["domaceizsrbije.rs"]
+def test_prodavnica_ima_oko_175_zahteva(izvestaji):
+    report = izvestaji["prodavnica.example"]
     zahtevi = next(f for f in report.findings if f.check_id == "perf.request.count")
     assert zahtevi.evidence["zahteva"] >= 150 and zahtevi.severity == "high"
     tezina = next(f for f in report.findings if f.check_id == "perf.page.weight")
     assert SEVERITY_ORDER[tezina.severity] >= SEVERITY_ORDER["medium"]
 
 
-def test_ordinacijadenta_dokaz_razlikuje_stanja_alt_atributa(izvestaji):
+def test_ordinacija_dokaz_razlikuje_stanja_alt_atributa(izvestaji):
     """§12.4: dokaz mora reći 28/30 i razlikovati „nema atribut" od `alt=""`."""
-    report = izvestaji["ordinacijadenta.rs"]
+    report = izvestaji["ordinacija.example"]
     alt = next(f for f in report.findings if f.check_id == "a11y.img.alt.missing")
     assert alt.evidence["bez_alta"] == 28
     assert alt.evidence["ukupno"] == 30
@@ -156,13 +156,13 @@ def test_ordinacijadenta_dokaz_razlikuje_stanja_alt_atributa(izvestaji):
     assert alt.severity == "high", "udeo > 0,8 uz ≥ 15 slika prelazi u high (§7.4)"
 
 
-def test_cdei_nema_nijedan_seo_nalaz_a_ipak_stize_na_nivo_2(izvestaji):
-    """Najvredniji test posle protetice (§12.4).
+def test_b2b_firma_nema_nijedan_seo_nalaz_a_ipak_stize_na_nivo_2(izvestaji):
+    """Najvredniji test posle klinike (§12.4).
 
     Sajt bez nalaza nivoa 1 mora da stigne na nivo 2 preko petog uslova
     eskalacije — inače bi ga alat proglasio čistim.
     """
-    report = izvestaji["cdei.rs"]
+    report = izvestaji["b2b-firma.example"]
     seo = {c for c in ids(report) if c.startswith("seo.")}
     assert seo == set(), f"lažni pozitivi u SEO grupi: {sorted(seo)}"
     assert any(c.startswith("perf.") for c in ids(report))
@@ -173,18 +173,18 @@ def test_cdei_nema_nijedan_seo_nalaz_a_ipak_stize_na_nivo_2(izvestaji):
     )
 
 
-def test_protetica_je_cista(izvestaji):
+def test_klinika_je_cista(izvestaji):
     """U4 iz §1.2 — najvažniji kriterijum i najlakše ga je izgubiti iz vida."""
-    report = izvestaji["protetica.com"]
+    report = izvestaji["klinika.example"]
     assert len(report.findings) <= 2, f"lažni pozitivi: {sorted(ids(report))}"
     previsoki = [f.check_id for f in report.findings if SEVERITY_ORDER[f.severity] > SEVERITY_ORDER["medium"]]
     assert previsoki == [], f"čist sajt ne sme da ima nalaz iznad medium: {previsoki}"
 
 
-def test_protetica_je_na_dnu_rangiranja(izvestaji):
+def test_klinika_je_na_dnu_rangiranja(izvestaji):
     poredak = rank(list(izvestaji.values()))
-    assert poredak[-1].domain == "protetica.com"
-    assert poredak[0].domain == "restoranmb.com"
+    assert poredak[-1].domain == "klinika.example"
+    assert poredak[0].domain == "restoran-centar.example"
 
 
 def test_recheck_kroz_pipeline_daje_isto_rangiranje(izvestaji):

@@ -99,7 +99,7 @@ Ozbiljnost: major   Prioritet: high
 KORACI ZA REPRODUKCIJU
  1. Skenirati listu na kojoj je više od 60 kandidata za nivo 2.
 OČEKIVANO   Sajt čiji je jedini signal na nivou 2 (spora početna, nema h1 u sirovom HTML-u)
-            stiže na nivo 2 — to je smisao pravila iz §6 (cdei.rs).
+            stiže na nivo 2 — to je smisao pravila iz §6 (b2b-firma.example).
 STVARNO     Kandidati se biraju po skoru nivoa 1, pa sajtovi sa skorom 0 ispadaju prvi.
             U izveštaju stoje kao „0 nalaza", iako težina, vreme i h1 nisu ni mereni.
 UČESTALOST  9 od 18 odsečenih kandidata nije imalo nijedan nalaz nivoa 1

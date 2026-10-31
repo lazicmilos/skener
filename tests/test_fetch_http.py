@@ -129,10 +129,10 @@ def test_sitemap_direktiva_iz_robots_a_ima_prednost():
 
 def test_sonde_su_deterministicke():
     """Isti domen mora da da iste sonde u svakom prolazu, inače testovi ne važe (§5.2)."""
-    prvi = probe_urls("mensa.rs", "https://mensa.rs/")
-    assert prvi == probe_urls("mensa.rs", "https://mensa.rs/")
-    assert prvi != probe_urls("angolo.rs", "https://angolo.rs/")
-    assert prvi[0].endswith("9e906fa852dc56e1") and prvi[1].endswith(".html")
+    prvi = probe_urls("institucija.example", "https://institucija.example/")
+    assert prvi == probe_urls("institucija.example", "https://institucija.example/")
+    assert prvi != probe_urls("restoran-ugao.example", "https://restoran-ugao.example/")
+    assert prvi[0].endswith("e3ce7e80ecbd5228") and prvi[1].endswith(".html")
 
 
 def test_sonde_u_snapshotu_prate_cistu_funkciju():
@@ -466,7 +466,7 @@ def test_snapshot_se_pise_na_disk_cim_je_domen_gotov(tmp_path):
 @pytest.mark.parametrize(
     "domain, expected",
     [
-        ("mensa.rs", "mensa.rs"),
+        ("institucija.example", "institucija.example"),
         ("http://127.0.0.1:8123", "http_127.0.0.1_8123"),
         ("../../etc/passwd", "etc_passwd"),
         ("", "nepoznat-domen"),
@@ -526,7 +526,7 @@ def test_vreme_odgovora_ne_uključuje_pauzu_pristojnosti():
     """`elapsed_ms` je ono što server radi, ne ono što mi čekamo.
 
     Inače pravilo eskalacije „početna odgovara > 1500 ms" pali za svakoga ko je
-    čekao u redu, i gubi smisao zbog kog postoji (cdei.rs).
+    čekao u redu, i gubi smisao zbog kog postoji (b2b-firma.example).
     """
     with FakeSite() as site:
         # početna + robots + 2 mape + 2 sonde = 6; tek sedmi i osmi zahtev su uzorak
@@ -591,7 +591,7 @@ def test_tls_greska_ostaje_u_dokazu_i_kad_ponovni_dohvat_uspe():
 class YoastSajt(FakeSite):
     """WordPress + Yoast: indeks sa devet mapa, svaka sa po nekoliko stranica.
 
-    Snimljeno na domaceizsrbije.rs (9 mapa) i cdei.rs (6): čitanje svih mapa
+    Snimljeno na prodavnica.example (9 mapa) i b2b-firma.example (6): čitanje svih mapa
     potroši budžet od 16 zahteva pre nego što sonde za lažni 404 dođu na red.
     """
 

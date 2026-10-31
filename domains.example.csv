@@ -1,9 +1,9 @@
 domain,industry,note
-mensa.rs,institucija,canonical na svakoj strani isti
-ariaclubzlatibor.rs,hotel,Zlatibor
-restoranmb.com,restoran,teska pocetna
-angolo.rs,restoran,
-domaceizsrbije.rs,ecommerce,
-ordinacijadenta.rs,zdravstvo,
-cdei.rs,b2b,cist SEO, spora stranica
-protetica.com,zdravstvo,kontrolni cist sajt
+institucija.example,institucija,canonical na svakoj strani isti
+hotel-planina.example,hotel,planina
+restoran-centar.example,restoran,teska pocetna
+restoran-ugao.example,restoran,
+prodavnica.example,ecommerce,
+ordinacija.example,zdravstvo,
+b2b-firma.example,b2b,cist SEO, spora stranica
+klinika.example,zdravstvo,kontrolni cist sajt

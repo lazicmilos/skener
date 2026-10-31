@@ -39,7 +39,7 @@ Svaki pad u `live.txt` je jedno od tri, i treba reći koje:
 
 | Uzrok | Primer | Šta se radi |
 |---|---|---|
-| sajt se promenio | Mensa popravila canonical | beleška u `kalibracija.md`; fixture se osvežava |
+| sajt se promenio | institucija.example popravila canonical | beleška u `kalibracija.md`; fixture se osvežava |
 | prag je loš | `lang.mismatch` ne pali na očigledno srpskom sajtu | izmena u `skener.toml`, proveri sa `recheck` |
 | bag | provera kaže `ok`, a ručno vidiš problem | test koji pada + popravka, kao B1–B4 |
 
@@ -66,7 +66,7 @@ docker compose run --rm skener skener scan /rad/leads.csv --only cudan.rs --debu
 | `partial` među domenima koji rade | **< 10 %** | iznad toga budžet ili prag ne odgovara stvarnosti |
 | `unknown` za jednu proveru | **< 20 %** živih domena | proveru koja najčešće ne zna ne treba ni imati |
 | vreme za 50 domena | **< 4 min** | linearno do U1: 200 domena ≤ 15 min |
-| protetica.com | **≤ 2 nalaza** | U4: kontrolni čist sajt |
+| klinika.example | **≤ 2 nalaza** | U4: kontrolni čist sajt |
 | prvih 5 u rangiranju | **ručno potvrđeni** | ako #1 nije bolji lead od #10, rangiranje ne radi svoj posao |
 
 Za ručnu potvrdu otvori sajt, uporedi sa `message_client` iz `findings.csv`, i za svaki nalaz zapiši:

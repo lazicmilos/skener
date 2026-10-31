@@ -198,7 +198,7 @@ class _Recorder:
         """Telo koje ne stigne za `timeout` je nemereno, ne nula.
 
         Strim ili video se ne završi nikad, a merenje veličine na njega čeka bez
-        kraja — na protetica.com je to zauvek blokiralo ceo prolaz.
+        kraja — na klinika.example je to zauvek blokiralo ceo prolaz.
         """
         if self._tasks:
             _done, pending = await asyncio.wait(self._tasks, timeout=timeout)

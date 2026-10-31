@@ -40,14 +40,14 @@ def nalaz(check_id: str, category: str, severity: str, level: int = 1) -> CheckR
 
 # Nalazi iz ispitnog skupa (§12.4), prepisani u proverljiv oblik.
 ISPITNI_SKUP = {
-    "restoranmb.com": (
+    "restoran-centar.example": (
         "restoran",
         [
             nalaz("perf.page.weight", "perf", "critical", level=2),
             nalaz("seo.canonical.missing", "seo", "high"),
         ],
     ),
-    "angolo.rs": (
+    "restoran-ugao.example": (
         "restoran",
         [
             nalaz("seo.canonical.missing", "seo", "high"),
@@ -56,7 +56,7 @@ ISPITNI_SKUP = {
             nalaz("social.og.description.missing", "social", "medium"),
         ],
     ),
-    "mensa.rs": (
+    "institucija.example": (
         "institucija",
         [
             nalaz("seo.canonical.duplicate", "seo", "critical"),
@@ -64,7 +64,7 @@ ISPITNI_SKUP = {
             nalaz("seo.h1.missing", "seo", "high", level=2),
         ],
     ),
-    "ariaclubzlatibor.rs": (
+    "hotel-planina.example": (
         "hotel",
         [
             nalaz("seo.canonical.missing", "seo", "high"),
@@ -111,10 +111,10 @@ def test_mnozioci(category, severity, industry, expected):
 @pytest.mark.parametrize(
     "domain, max_weight, total",
     [
-        ("restoranmb.com", 60.0, 84.0),
-        ("angolo.rs", 30.0, 75.6),
-        ("mensa.rs", 40.0, 80.0),
-        ("ariaclubzlatibor.rs", 30.0, 99.4),
+        ("restoran-centar.example", 60.0, 84.0),
+        ("restoran-ugao.example", 30.0, 75.6),
+        ("institucija.example", 40.0, 80.0),
+        ("hotel-planina.example", 30.0, 99.4),
     ],
 )
 def test_rank_key_iz_specifikacije(domain, max_weight, total):
@@ -123,38 +123,38 @@ def test_rank_key_iz_specifikacije(domain, max_weight, total):
 
 
 def test_jedan_critical_nadjacava_cetiri_srednja_nalaza():
-    """§9.4, prvi red: restoranmb iznad angola iako ima manje nalaza."""
-    restoran, angolo = izvestaj("restoranmb.com"), izvestaj("angolo.rs")
-    assert len(restoran.findings) < len(angolo.findings)
-    assert rank([angolo, restoran])[0].domain == "restoranmb.com"
+    """§9.4, prvi red: restoran-centar iznad restoran-ugla iako ima manje nalaza."""
+    restoran, ugao = izvestaj("restoran-centar.example"), izvestaj("restoran-ugao.example")
+    assert len(restoran.findings) < len(ugao.findings)
+    assert rank([ugao, restoran])[0].domain == "restoran-centar.example"
 
 
 def test_najtezi_nalaz_nadjacava_veci_zbir():
     """§9.4, drugi red — ceo smisao pravila.
 
-    Aria ima veći zbir (99,4 prema 80), ali Mensa ima skuplji pojedinačni
+    Hotel ima veći zbir (99,4 prema 80), ali institucija ima skuplji pojedinačni
     problem. Ako implementacija ovo obrne, greška je u `rank_key`, ne u pragovima.
     """
-    mensa, aria = izvestaj("mensa.rs"), izvestaj("ariaclubzlatibor.rs")
-    assert aria.total_score > mensa.total_score
-    poredak = [r.domain for r in rank([aria, mensa])]
-    assert poredak == ["mensa.rs", "ariaclubzlatibor.rs"]
+    institucija, hotel = izvestaj("institucija.example"), izvestaj("hotel-planina.example")
+    assert hotel.total_score > institucija.total_score
+    poredak = [r.domain for r in rank([hotel, institucija])]
+    assert poredak == ["institucija.example", "hotel-planina.example"]
 
 
 def test_rangiranje_dodeljuje_redne_brojeve():
-    """Aria i angolo su izjednačeni na 30; zbir ih razrešava (99,4 > 75,6)."""
+    """Hotel i restoran-ugao su izjednačeni na 30; zbir ih razrešava (99,4 > 75,6)."""
     poredak = rank([izvestaj(d) for d in ISPITNI_SKUP])
     assert [r.rank for r in poredak] == [1, 2, 3, 4]
     assert [r.domain for r in poredak] == [
-        "restoranmb.com",  # (60; 84)
-        "mensa.rs",  # (40; 80)
-        "ariaclubzlatibor.rs",  # (30; 99,4)
-        "angolo.rs",  # (30; 75,6)
+        "restoran-centar.example",  # (60; 84)
+        "institucija.example",  # (40; 80)
+        "hotel-planina.example",  # (30; 99,4)
+        "restoran-ugao.example",  # (30; 75,6)
     ]
 
 
 def test_nalazi_su_sortirani_po_tezini_i_tri_staju_u_mejl():
-    report = izvestaj("ariaclubzlatibor.rs")
+    report = izvestaj("hotel-planina.example")
     tezine = [f.weight for f in report.findings]
     assert tezine == sorted(tezine, reverse=True)
     assert len(report.top_findings) == 3
@@ -163,7 +163,7 @@ def test_nalazi_su_sortirani_po_tezini_i_tri_staju_u_mejl():
 
 def test_ozbiljnost_se_ne_menja_posle_mnozenja():
     """Množilac menja broj bodova, ne ozbiljnost (§3.5)."""
-    report = izvestaj("restoranmb.com")
+    report = izvestaj("restoran-centar.example")
     najtezi = report.findings[0]
     assert najtezi.severity == "critical" and najtezi.weight == 60.0
 
@@ -195,7 +195,7 @@ def test_cist_i_brz_sajt_ne_ide_na_nivo_2():
 
 
 def test_prazan_sirovi_html_salje_na_nivo_2():
-    """Ovo je Mensa: sadržaj se crta iz JS-a, nivo 1 ne vidi ništa (§6)."""
+    """Ovo je institucija: sadržaj se crta iz JS-a, nivo 1 ne vidi ništa (§6)."""
     site = clean_site()
     site.home.text_length = 120
     site.home.h1_count_raw = 0
@@ -224,7 +224,7 @@ def test_nalaz_ozbiljnosti_medium_salje_na_nivo_2():
 def test_spora_pocetna_salje_na_nivo_2():
     """§6, poslednji red — jedini netrivijalan slučaj politike.
 
-    `cdei.rs` je „čist SEO, spora stranica": nema nalaza nivoa 1, ima sadržaj u
+    `b2b-firma.example` je „čist SEO, spora stranica": nema nalaza nivoa 1, ima sadržaj u
     sirovom HTML-u, HTML mu nije velik. Po prva četiri uslova nikad ne bi stigao
     na nivo 2 i alat bi ga proglasio čistim.
     """

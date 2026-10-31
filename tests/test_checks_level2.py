@@ -180,7 +180,7 @@ def test_prazan_alt_nije_greska():
 
 
 def test_evidence_razlikuje_nema_atributa_od_praznog():
-    """§12.4, ordinacijadenta.rs: dokaz mora da kaže 28/30 i da razlikuje stanja."""
+    """§12.4, ordinacija.example: dokaz mora da kaže 28/30 i da razlikuje stanja."""
     browser = clean_browser()
     browser.dom = DomStats(h1_count=1, images_total=30, images_without_alt_attr=28, images_empty_alt=2)
     evidence = run_level(2, browser)["a11y.img.alt.missing"].findings[0].evidence

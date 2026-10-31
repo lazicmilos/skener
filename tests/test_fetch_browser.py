@@ -416,7 +416,7 @@ def test_drugi_prolaz_meri_isto_jer_je_kes_prazan():
 
 
 # --------------------------------------------------------------------------- #
-# Zastoji — snimljeno na protetica.com: jedan odgovor čije telo nikad ne stigne
+# Zastoji — snimljeno na klinika.example: jedan odgovor čije telo nikad ne stigne
 # je zauvek blokirao ceo prolaz. Sve ovde mora da se završi u roku.
 # --------------------------------------------------------------------------- #
 STRIM_STRANA = b"""<!doctype html><html lang="sr"><head><title>Strim</title></head>

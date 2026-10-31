@@ -155,6 +155,7 @@ POZITIVNI_CELI = (
     "http.domain_concurrency",
     "browser.concurrency",
     "http.max_requests_per_domain",
+    "http.max_body_bytes",
 )
 
 

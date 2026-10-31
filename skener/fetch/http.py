@@ -16,6 +16,7 @@ import random
 import socket
 import ssl
 import time
+import zlib
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -50,6 +51,10 @@ log = logging.getLogger("skener.fetch")
 # Statusi na koje se odustaje od domena za ovaj prolaz (§8.3) — ne pokušava se ponovo.
 ODUSTANI_STATUSI = {429, 503}
 PROBE_SUFFIXES = ("", ".html")
+# Telo veće od `http.max_body_bytes`: server je odgovorio, ali telo se ne čita do kraja.
+PREVELIKO = "body_too_large"
+# Kodiranja koja se raspakuju ovde, sa granicom; ostala stižu kao sirovi bajtovi.
+ZLIB_WBITS = {"gzip": zlib.MAX_WBITS | 16, "deflate": zlib.MAX_WBITS}
 # DNS greška je greška imena, pa ni http na istom imenu ne pomaže.
 DNS = frozenset({"dns", "dns_nxdomain", "dns_nodata", "dns_temporary"})
 # `dns_nodata`: ime postoji, ali nema adresu. Na Windows-u je EAI_NODATA isto što i EAI_NONAME,
@@ -228,6 +233,7 @@ class Fetcher:
         self._host_locks: dict[str, asyncio.Lock] = {}
         self._host_next_allowed: dict[str, float] = {}
         self._delay_range = [ms / 1000 for ms in get(config, "http.delay_ms")]
+        self._max_body = get(config, "http.max_body_bytes")
         self._client: httpx.AsyncClient | None = None
         self._insecure: httpx.AsyncClient | None = None
 
@@ -256,7 +262,9 @@ class Fetcher:
             # Bez HTTP(S)_PROXY iz okruženja: proxy sam razrešava ime, pa bi zaobišao proveru.
             trust_env=False,
             follow_redirects=True,
-            headers={"User-Agent": user_agent(self.config)},
+            # Samo ono što `_read_body` raspakuje sa granicom. Inače bi httpx, kad se instaliraju
+            # brotli ili zstandard, tražio i br/zstd, pa bi ponašanje zavisilo od paketa na mašini.
+            headers={"User-Agent": user_agent(self.config), "Accept-Encoding": "gzip, deflate"},
             timeout=httpx.Timeout(
                 get(self.config, "http.timeout_total_s"),
                 connect=get(self.config, "http.timeout_connect_s"),
@@ -323,35 +331,91 @@ class Fetcher:
 
     async def _send(self, url: str, *, verify: bool, stop_at: str | None = None) -> Outcome:
         """`stop_at`: adresa koja je već preuzeta. Preusmerenje na nju se ne prati, a ishod je
-        odgovor koji na nju upućuje, bez tela (Z-26)."""
+        odgovor koji na nju upućuje, bez tela (Z-26).
+
+        Preusmerenja se prate ovde, ne u httpx-u: httpx čita telo svakog koraka bez granice.
+        """
         client = self._pick_client(verify=verify)
+        request = client.build_request("GET", url)
+        lanac: list[str] = []
         try:
-            response = await client.get(url, follow_redirects=stop_at is None)
-            koraci = [response]
-            while response.next_request is not None:
-                sledeca = str(response.next_request.url)
-                if normalize(sledeca) == normalize(stop_at):
-                    lanac = [str(r.url) for r in koraci] + [sledeca]
-                    status = response.status_code
-                    return Outcome(url=url, status=status, final_url=sledeca, redirect_chain=lanac)
-                if len(koraci) > client.max_redirects:
-                    raise httpx.TooManyRedirects("Exceeded maximum allowed redirects.")
-                response = await client.send(response.next_request, follow_redirects=False)
-                koraci.append(response)
+            while True:
+                response = await client.send(request, stream=True, follow_redirects=False)
+                try:
+                    lanac.append(str(response.url))
+                    sledeci = response.next_request
+                    if sledeci is None:
+                        body = await _read_body(response, self._max_body)
+                        break
+                    if stop_at is not None and normalize(str(sledeci.url)) == normalize(stop_at):
+                        lanac.append(str(sledeci.url))
+                        status = response.status_code
+                        return Outcome(url=url, status=status, final_url=lanac[-1], redirect_chain=lanac)
+                    if len(lanac) > client.max_redirects:
+                        raise httpx.TooManyRedirects("Exceeded maximum allowed redirects.")
+                    # Telo koraka se ne koristi, ali pročitana veza ostaje za sledeći zahtev.
+                    await _read_body(response, self._max_body)
+                    request = sledeci
+                finally:
+                    await response.aclose()
         except Exception as exc:  # noqa: BLE001 — izuzetak nikad ne napušta domen (§8.2)
             kind, detail = _classify(exc)
             return Outcome(url=url, error_kind=kind, error_detail=detail)
 
-        # Sa `stop_at` httpx ne vodi istoriju, pa lanac čine koraci; bez njega je jedan korak.
-        chain = [str(r.request.url) for r in response.history] + [str(r.url) for r in koraci]
-        return Outcome(
+        outcome = Outcome(
             url=url,
             status=response.status_code,
             final_url=str(response.url),
-            redirect_chain=chain,
+            redirect_chain=lanac,
             headers=dict(response.headers),
-            body=response.content,
+            body=body,
         )
+        if body is None:
+            outcome.error_kind = PREVELIKO
+            outcome.error_detail = f"body > {self._max_body} B (http.max_body_bytes)"
+        return outcome
+
+
+async def _read_body(response: httpx.Response, limit: int) -> bytes | None:
+    """Telo raspakovano po `Content-Encoding`, ili `None` kad pređe `limit` bajtova.
+
+    Sajt je nepoverljiv ulaz, a gzip bomba od par kB daje gigabajte. httpx raspakuje svaki
+    stigli komad bez granice (do ~1000 × 64 kB), pa se ovde čita sirovo i raspakuje sa
+    `max_length`: u memoriji nikad nije više od `limit + 1` bajtova. I sirovih bajtova sme
+    najviše `limit`, jer tok koji se raspakuje u ništa bi inače tekao dok server hoće.
+    Kodiranje van gzip/deflate ostaje sirovo, kao u httpx-u bez brotli i zstandard paketa.
+    """
+    encoding = response.headers.get("content-encoding", "").strip().lower()
+    inflater = None
+    body, raw = bytearray(), 0
+    try:
+        async for chunk in response.aiter_raw():
+            raw += len(chunk)
+            if encoding in ZLIB_WBITS:
+                # `max_length` ≥ 1, jer je `len(body) ≤ limit`; nula bi značila „bez granice".
+                room = limit + 1 - len(body)
+                if inflater is None:
+                    inflater, chunk = _first_inflate(encoding, chunk, room)
+                else:
+                    chunk = inflater.decompress(chunk, room)
+            body += chunk
+            if raw > limit or len(body) > limit:
+                return None
+    except zlib.error as exc:
+        raise httpx.DecodingError(str(exc)) from exc
+    return bytes(body)
+
+
+def _first_inflate(encoding: str, chunk: bytes, room: int) -> tuple[zlib._Decompress, bytes]:
+    """Prvi komad bira omot: deflate je po RFC-u zlib, a stari IIS šalje goli deflate (kao httpx)."""
+    inflater = zlib.decompressobj(ZLIB_WBITS[encoding])
+    try:
+        return inflater, inflater.decompress(chunk, room)
+    except zlib.error:
+        if encoding != "deflate":
+            raise
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    return inflater, inflater.decompress(chunk, room)
 
 
 async def measure_link(config: dict) -> float | None:
@@ -384,8 +448,9 @@ def _should_retry(outcome: Outcome) -> bool:
     """4xx je odgovor, ne greška — bez ponovnog pokušaja (§4.6). Privremena greška DNS-a (EAI_AGAIN)
     se ponavlja, a ime koje ne postoji ne."""
     ponovi = {"no_connection", "connect_timeout", "read_timeout", "timeout", "connection", "dns_temporary"}
-    if outcome.error_kind in ponovi:
-        return True
+    if outcome.error_kind:
+        # Preveliko telo uz 5xx se ne traži ponovo: bomba bi dobila još jedan krug.
+        return outcome.error_kind in ponovi
     return outcome.status is not None and 500 <= outcome.status < 600
 
 
@@ -480,16 +545,24 @@ async def fetch_site(fetcher: Fetcher, target: DomainInput) -> SiteSnapshot:
 
 
 def _home(outcome: Outcome) -> PageSnapshot:
-    return page_builder.build(
+    return _page(outcome, keep_raw_html=True)
+
+
+def _page(outcome: Outcome, *, keep_raw_html: bool = False) -> PageSnapshot:
+    """Stranica iz ishoda. Bez tela (greška, i preveliko telo uz status 200) nema ni statusa:
+    provere `status == 200` čitaju kao „sadržaj strane je tu", kao kod prekida usred tela."""
+    page = page_builder.build(
         outcome.url,
         final_url=outcome.final_url,
-        status=outcome.status,
+        status=None if outcome.error_kind else outcome.status,
         headers=outcome.headers,
         body=outcome.body,
         elapsed_ms=outcome.elapsed_ms,
         redirect_hops=max(len(outcome.redirect_chain) - 1, 0),
-        keep_raw_html=True,
+        keep_raw_html=keep_raw_html,
     )
+    page.error_kind, page.error_detail = outcome.error_kind, outcome.error_detail
+    return page
 
 
 def _origin_of(url: str) -> str:
@@ -527,7 +600,9 @@ async def _fetch_entry(
         retry = await fetcher.request(candidates[0], budget, verify=False)
         return (retry if retry.ok else outcome), outcome.error_detail or "nepoznata TLS greška"
 
-    if not outcome.ok and outcome.error_kind not in DNS | {"budget", "blocked"} and len(candidates) > 1:
+    # Preveliko telo je odgovor servera, pa ni http ne daje drugu početnu.
+    bez_pada = DNS | {"budget", "blocked", PREVELIKO}
+    if not outcome.ok and outcome.error_kind not in bez_pada and len(candidates) > 1:
         snapshot.errors.append(SnapshotError("entry", outcome.error_kind or "?", outcome.error_detail or ""))
         fallback = await fetcher.request(candidates[1], budget)
         if fallback.ok:
@@ -695,17 +770,7 @@ async def _fetch_sample(
         outcome = await fetcher.request(url, budget, verify=verify, crawl_delay=crawl_delay)
         if outcome.error_kind == "budget":
             break
-        snapshot.pages.append(
-            page_builder.build(
-                url,
-                final_url=outcome.final_url,
-                status=outcome.status,
-                headers=outcome.headers,
-                body=outcome.body,
-                elapsed_ms=outcome.elapsed_ms,
-                redirect_hops=max(len(outcome.redirect_chain) - 1, 0),
-            )
-        )
+        snapshot.pages.append(_page(outcome))
 
 
 def probe_urls(domain: str, origin: str) -> list[str]:

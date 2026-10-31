@@ -9,6 +9,18 @@ izmena koja lomi kompatibilnost (status domena, `check_id`, oblik nalaza, JSON) 
 
 - Tekst uz svaki sajt je u izveštaju „predlog teksta”, a ne „nacrt mejla”: može da posluži za
   poruku, poziv ili kontakt formu. Sam tekst je isti.
+- Telo odgovora na nivou 1 ima gornju granicu, `[http] max_body_bytes` (10 MiB), i za
+  raspakovane i za sirove bajtove. Sajt je nepoverljiv ulaz: odgovor od par kB sa
+  `Content-Encoding: gzip` raspakovao se u memoriju do kraja, a ograničavao ga je samo vremenski
+  budžet domena. Telo preko granice se ne čita dalje i ishod je greška `body_too_large`, uz status
+  koji je server vratio. Početna preko granice daje domen `failed` sa razlogom
+  `body_too_large: body > 10485760 B (http.max_body_bytes)`, bez pada na http i bez ponovnog
+  pokušaja; strana iz uzorka preko granice nema status, a ostatak prolaza ide dalje. Mapa sajta
+  preko granice je kao neispravna mapa, isto kao ranije.
+- Nivo 1 traži samo `Accept-Encoding: gzip, deflate`, ono što raspakuje sa granicom. Ranije je
+  zavisilo od instaliranih paketa: sa brotli ili zstandard tražio je i `br`/`zstd`.
+- Strana sa greškom (početna i uzorak) nosi `error_kind` i `error_detail` u snimku; ranije su bili
+  prazni.
 
 ### Ispravljeno
 
@@ -25,6 +37,11 @@ izmena koja lomi kompatibilnost (status domena, `check_id`, oblik nalaza, JSON) 
   slajderu), sa najvećim procenjenim viškom. Broj slika i višak u kB bili su preveliki, a višak
   ponekad veći od cele strane: na jednom sajtu 7.011 kB umesto 2.923 kB. Na pravom prolazu od 249
   domena 5 od 91 nalaza `perf.img.oversized` više ne prelazi prag (BUG-030).
+- Mapa sajta `.xml.gz` se raspakuje najviše do 10 MiB + 1 bajt; gzip bomba se ranije raspakovala
+  cela pre provere veličine. Oštećen ili odsečen `.xml.gz` je neispravna mapa; ranije je izuzetak
+  (`zlib.error`, `EOFError`) oborio ceo domen.
+- Preusmerenja nivoa 1 se prate bez čitanja celog tela svakog koraka: telo preusmerenja ima istu
+  granicu kao i ostala tela.
 
 ## 2.0.0 — 2026-10-06
 

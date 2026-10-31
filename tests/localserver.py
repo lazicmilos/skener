@@ -25,6 +25,8 @@ class Response:
     # Zaglavlja i prvi bajt odmah, ostatak tek posle `stall` sekundi — kao strim ili
     # video koji se nikad ne završi. `delay` je pre zaglavlja, ovo je posle njih.
     stall: float = 0.0
+    # Telo je već kodirano (npr. gzip bomba sastavljena u testu), pa ga server ne pakuje ponovo.
+    encoded: bool = False
 
 
 def html(title: str, *, body: str = "", head: str = "") -> bytes:
@@ -175,7 +177,7 @@ class FakeSite:
                         time.sleep(response.delay)
                     body = response.body
                     headers = dict(response.headers)
-                    if headers.get("content-encoding") == "gzip":
+                    if headers.get("content-encoding") == "gzip" and not response.encoded:
                         body = gzip.compress(body)
                     self.send_response(response.status)
                     for key, value in headers.items():

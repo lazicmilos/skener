@@ -125,7 +125,8 @@ def _failure(site: SiteSnapshot) -> Reason:
     entry = site.entry
     if entry is None:
         return Reason("entry_missing")
-    if entry.status is not None:
+    # Greška ide pre statusa: uz preveliko telo status je 200, a razlog je telo (`body_too_large`).
+    if entry.error_kind is None and entry.status is not None:
         return Reason("entry_status", {"status": entry.status})
     return Reason("entry_error", {"vrsta": entry.error_kind, "detalj": entry.error_detail or ""})
 

@@ -142,7 +142,13 @@ def test_identitet_od_samih_ne_ascii_znakova_puca(bez_okruzenja):
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "kljuc",
-    ["http.concurrency", "http.domain_concurrency", "browser.concurrency", "http.max_requests_per_domain"],
+    [
+        "http.concurrency",
+        "http.domain_concurrency",
+        "browser.concurrency",
+        "http.max_requests_per_domain",
+        "http.max_body_bytes",
+    ],
 )
 @pytest.mark.parametrize(
     "vrednost, ispravna",

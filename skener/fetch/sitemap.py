@@ -6,7 +6,7 @@ Parsiranje i uzorkovanje su čiste funkcije; rekurzivno dohvatanje radi
 
 from __future__ import annotations
 
-import gzip
+import zlib
 from collections import defaultdict
 from collections.abc import Iterable
 from typing import Literal
@@ -21,6 +21,7 @@ SitemapKind = Literal["index", "urlset", "unknown"]
 # XML bombi, `defusedxml.ElementTree` je zamena u jednom redu.
 MAX_PARSE_BYTES = 10 * 1024 * 1024
 GZIP_MAGIC = b"\x1f\x8b"
+GZIP_WBITS = zlib.MAX_WBITS | 16  # 31: gzip zaglavlje i CRC
 
 
 def parse(data: bytes | None) -> tuple[SitemapKind, list[str]]:
@@ -28,9 +29,8 @@ def parse(data: bytes | None) -> tuple[SitemapKind, list[str]]:
     if not data:
         return "unknown", []
     if data[:2] == GZIP_MAGIC:
-        try:
-            data = gzip.decompress(data)
-        except OSError:
+        data = _gunzip(data)
+        if data is None:
             return "unknown", []
     if len(data) > MAX_PARSE_BYTES:
         return "unknown", []
@@ -57,6 +57,24 @@ def parse(data: bytes | None) -> tuple[SitemapKind, list[str]]:
         if _tag(loc) == "loc" and loc.text and loc.text.strip()
     ]
     return kind, locations
+
+
+def _gunzip(data: bytes) -> bytes | None:
+    """Raspakuje najviše `MAX_PARSE_BYTES + 1` bajt: gzip bomba od 10 kB daje 10 MB, a
+    `gzip.decompress` bi raspakovao sve pre provere dužine. Taj bajt više kaže „preveliko".
+
+    Oštećen ili odsečen gzip je `None`. `gzip.decompress` je tada bacao `zlib.error` ili
+    `EOFError`, a nijedan nije `OSError`, pa je izuzetak oborio ceo domen.
+    """
+    inflater = zlib.decompressobj(GZIP_WBITS)
+    try:
+        out = inflater.decompress(data, MAX_PARSE_BYTES + 1)
+    except zlib.error:
+        return None
+    # Kraj toka je obavezan samo za ono što stane: preveliko je ionako `unknown`.
+    if len(out) <= MAX_PARSE_BYTES and not inflater.eof:
+        return None
+    return out
 
 
 def _tag(element: ElementTree.Element) -> str:

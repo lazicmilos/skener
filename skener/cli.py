@@ -27,7 +27,7 @@ log = logging.getLogger("skener")
 PRIMER = """
 primeri:
   skener scan domains.example.csv --out izvestaj/
-  skener scan domains.csv --level 1 --concurrency 4 --only mensa.rs
+  skener scan domains.csv --level 1 --concurrency 4 --only institucija.example
   skener recheck snapshots/ --out izvestaj/        # bez mreže, za kalibraciju pragova
   skener record domains.example.csv --out tests/fixtures/
   skener explain seo.canonical.duplicate

@@ -134,7 +134,7 @@ def rank(reports: Iterable[DomainReport]) -> list[DomainReport]:
     """§9.4: sajt sa jednom katastrofom je bolji lead od sajta sa deset sitnica.
 
     Primarni ključ je najteži pojedinačni nalaz; zbir samo razrešava izjednačenje.
-    Rangiranje po zbiru bi Ariju stavilo iznad Mense, a Mensa ima najskuplji SEO
+    Rangiranje po zbiru bi hotel stavilo iznad institucije, a institucija ima najskuplji SEO
     problem koji postoji. Rangiraju se samo sajtovi koji rade (Z-20): onaj koji se ne
     otvara ide u „Ne rade", a onaj koji alat nije pregledao u „Nije skenirano".
     """
@@ -176,7 +176,7 @@ def escalation_reasons(site: SiteSnapshot, results: Sequence[CheckResult], confi
         reasons.append(Reason("html_uncompressed"))
 
     # Ovaj uslov zatvara rupu koju ostala četiri ostavljaju: sajt sa čistim SEO-om
-    # i sporom stranicom inače nikad ne bi stigao na nivo 2 (§6, `cdei.rs`).
+    # i sporom stranicom inače nikad ne bi stigao na nivo 2 (§6, `b2b-firma.example`).
     slow = get(config, "escalation.slow_entry_ms")
     if site.entry and site.entry.elapsed_ms and site.entry.elapsed_ms > slow:
         reasons.append(Reason("slow_entry", {"ms": site.entry.elapsed_ms, "prag": slow}))
